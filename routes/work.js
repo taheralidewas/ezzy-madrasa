@@ -192,4 +192,159 @@ router.get('/users', auth, async (req, res) => {
     }
 });
 
+// Get member-wise reports (admin and managers only)
+router.get('/reports', auth, async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.userId);
+
+        if (!['admin', 'manager'].includes(currentUser.role)) {
+            return res.status(403).json({ message: 'Not authorized to view reports' });
+        }
+
+        const { period = 'weekly', startDate, endDate } = req.query;
+
+        // Calculate date ranges based on period
+        let dateFilter = {};
+        const now = new Date();
+
+        if (startDate && endDate) {
+            dateFilter = {
+                createdAt: {
+                    $gte: new Date(startDate),
+                    $lte: new Date(endDate)
+                }
+            };
+        } else {
+            switch (period) {
+                case 'weekly':
+                    const weekStart = new Date(now);
+                    weekStart.setDate(now.getDate() - 7);
+                    dateFilter = { createdAt: { $gte: weekStart } };
+                    break;
+                case 'monthly':
+                    const monthStart = new Date(now);
+                    monthStart.setMonth(now.getMonth() - 1);
+                    dateFilter = { createdAt: { $gte: monthStart } };
+                    break;
+                case 'yearly':
+                    const yearStart = new Date(now);
+                    yearStart.setFullYear(now.getFullYear() - 1);
+                    dateFilter = { createdAt: { $gte: yearStart } };
+                    break;
+            }
+        }
+
+        // Get users based on role permissions
+        let userQuery = { isActive: true };
+        if (currentUser.role === 'manager') {
+            userQuery.department = currentUser.department;
+        }
+
+        const users = await User.find(userQuery).select('name email role department');
+
+        // Get work assignments for the period
+        const works = await Work.find(dateFilter)
+            .populate('assignedTo', 'name email role department')
+            .populate('assignedBy', 'name email role department');
+
+        // Filter works based on user permissions
+        let filteredWorks = works;
+        if (currentUser.role === 'manager') {
+            filteredWorks = works.filter(work =>
+                work.assignedTo && work.assignedTo.department === currentUser.department
+            );
+        }
+
+        // Generate member-wise report
+        const memberReports = users.map(user => {
+            const userWorks = filteredWorks.filter(work =>
+                work.assignedTo && work.assignedTo._id.toString() === user._id.toString()
+            );
+
+            const statusCounts = {
+                pending: userWorks.filter(w => w.status === 'pending').length,
+                'in-progress': userWorks.filter(w => w.status === 'in-progress').length,
+                completed: userWorks.filter(w => w.status === 'completed').length,
+                cancelled: userWorks.filter(w => w.status === 'cancelled').length
+            };
+
+            const priorityCounts = {
+                low: userWorks.filter(w => w.priority === 'low').length,
+                medium: userWorks.filter(w => w.priority === 'medium').length,
+                high: userWorks.filter(w => w.priority === 'high').length,
+                urgent: userWorks.filter(w => w.priority === 'urgent').length
+            };
+
+            // Calculate completion rate
+            const totalTasks = userWorks.length;
+            const completedTasks = statusCounts.completed;
+            const completionRate = totalTasks > 0 ? ((completedTasks / totalTasks) * 100).toFixed(1) : 0;
+
+            // Calculate average completion time for completed tasks
+            const completedWorks = userWorks.filter(w => w.status === 'completed' && w.completedAt);
+            let avgCompletionTime = 0;
+            if (completedWorks.length > 0) {
+                const totalTime = completedWorks.reduce((sum, work) => {
+                    const assignedTime = new Date(work.createdAt);
+                    const completedTime = new Date(work.completedAt);
+                    return sum + (completedTime - assignedTime);
+                }, 0);
+                avgCompletionTime = Math.round(totalTime / (completedWorks.length * 24 * 60 * 60 * 1000)); // in days
+            }
+
+            return {
+                user: {
+                    id: user._id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    department: user.department
+                },
+                totalTasks,
+                statusCounts,
+                priorityCounts,
+                completionRate: parseFloat(completionRate),
+                avgCompletionTime,
+                recentTasks: userWorks.slice(0, 5).map(work => ({
+                    id: work._id,
+                    title: work.title,
+                    status: work.status,
+                    priority: work.priority,
+                    createdAt: work.createdAt,
+                    dueDate: work.dueDate,
+                    completedAt: work.completedAt
+                }))
+            };
+        });
+
+        // Sort by total tasks descending
+        memberReports.sort((a, b) => b.totalTasks - a.totalTasks);
+
+        // Generate summary statistics
+        const summary = {
+            totalMembers: memberReports.length,
+            totalTasks: filteredWorks.length,
+            completedTasks: filteredWorks.filter(w => w.status === 'completed').length,
+            pendingTasks: filteredWorks.filter(w => w.status === 'pending').length,
+            inProgressTasks: filteredWorks.filter(w => w.status === 'in-progress').length,
+            overallCompletionRate: filteredWorks.length > 0 ?
+                ((filteredWorks.filter(w => w.status === 'completed').length / filteredWorks.length) * 100).toFixed(1) : 0,
+            period,
+            dateRange: {
+                start: dateFilter.createdAt?.$gte || null,
+                end: dateFilter.createdAt?.$lte || now
+            }
+        };
+
+        res.json({
+            summary,
+            memberReports
+        });
+
+    } catch (error) {
+        console.error('Error generating reports:', error);
+        res.status(500).json({ message: error.message });
+    }
+});
+
 module.exports = router;

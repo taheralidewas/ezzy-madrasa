@@ -106,6 +106,9 @@
                     <button class="btn btn-outline-success me-2" onclick="showWhatsAppModal()" id="whatsappBtn" style="display: none;">
                         <i class="fab fa-whatsapp"></i> <span id="whatsappBtnText">Connect WhatsApp</span>
                     </button>
+                    <button class="btn btn-outline-primary me-2" onclick="showReportsModal()" id="reportsBtn" style="display: none;">
+                        <i class="fas fa-chart-bar"></i> Reports
+                    </button>
                     <button class="btn btn-info" onclick="loadWorks()">
                         <i class="fas fa-refresh"></i> Refresh
                     </button>
@@ -169,6 +172,109 @@
                         </div>
                         <button type="submit" class="btn btn-primary">Assign Work</button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reports Modal -->
+    <div class="modal fade" id="reportsModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-chart-bar"></i> Member-wise Reports</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Report Filters -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <label class="form-label">Report Period</label>
+                            <select class="form-select" id="reportPeriod" onchange="loadReports()">
+                                <option value="weekly">Last 7 Days</option>
+                                <option value="monthly">Last 30 Days</option>
+                                <option value="yearly">Last 365 Days</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3" id="customDateStart" style="display: none;">
+                            <label class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="reportStartDate">
+                        </div>
+                        <div class="col-md-3" id="customDateEnd" style="display: none;">
+                            <label class="form-label">End Date</label>
+                            <input type="date" class="form-control" id="reportEndDate">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button class="btn btn-primary d-block" onclick="loadReports()">
+                                <i class="fas fa-sync"></i> Generate
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loading Spinner -->
+                    <div id="reportsLoading" class="text-center py-4" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading reports...</span>
+                        </div>
+                        <p class="mt-2">Generating reports...</p>
+                    </div>
+
+                    <!-- Reports Content -->
+                    <div id="reportsContent">
+                        <!-- Summary Cards -->
+                        <div id="reportsSummary" class="row mb-4"></div>
+                        
+                        <!-- Member Reports Table -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Member Performance Details</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-hover" id="memberReportsTable">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Member</th>
+                                                <th>Department</th>
+                                                <th>Total Tasks</th>
+                                                <th>Completed</th>
+                                                <th>Pending</th>
+                                                <th>In Progress</th>
+                                                <th>Completion Rate</th>
+                                                <th>Avg. Days</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="memberReportsBody">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-success" onclick="exportReports()">
+                        <i class="fas fa-download"></i> Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Member Detail Modal -->
+    <div class="modal fade" id="memberDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="memberDetailTitle">Member Task Details</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="memberDetailContent"></div>
                 </div>
             </div>
         </div>

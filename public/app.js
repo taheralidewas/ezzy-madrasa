@@ -119,6 +119,7 @@ function showDashboard() {
     // Show assign work button for managers and admins
     if (['admin', 'manager'].includes(currentUser.role)) {
         document.getElementById('assignWorkBtn').style.display = 'inline-block';
+        document.getElementById('reportsBtn').style.display = 'inline-block';
         loadUsers();
     }
     
@@ -403,4 +404,349 @@ function hideQRModal() {
     if (modal) {
         modal.hide();
     }
+}
+
+// Reports Functions
+let currentReportsData = null;
+
+function showReportsModal() {
+    const modal = new bootstrap.Modal(document.getElementById('reportsModal'));
+    modal.show();
+    
+    // Set up period change handler
+    document.getElementById('reportPeriod').addEventListener('change', function() {
+        const customDateFields = ['customDateStart', 'customDateEnd'];
+        if (this.value === 'custom') {
+            customDateFields.forEach(id => document.getElementById(id).style.display = 'block');
+        } else {
+            customDateFields.forEach(id => document.getElementById(id).style.display = 'none');
+        }
+    });
+    
+    // Load initial reports
+    loadReports();
+}
+
+async function loadReports() {
+    const loadingDiv = document.getElementById('reportsLoading');
+    const contentDiv = document.getElementById('reportsContent');
+    
+    // Show loading
+    loadingDiv.style.display = 'block';
+    contentDiv.style.display = 'none';
+    
+    try {
+        const period = document.getElementById('reportPeriod').value;
+        let url = `/api/work/reports?period=${period}`;
+        
+        // Add custom date range if selected
+        if (period === 'custom') {
+            const startDate = document.getElementById('reportStartDate').value;
+            const endDate = document.getElementById('reportEndDate').value;
+            
+            if (startDate && endDate) {
+                url += `&startDate=${startDate}&endDate=${endDate}`;
+            } else {
+                alert('Please select both start and end dates for custom range');
+                loadingDiv.style.display = 'none';
+                contentDiv.style.display = 'block';
+                return;
+            }
+        }
+        
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            currentReportsData = await response.json();
+            displayReports(currentReportsData);
+        } else {
+            const error = await response.json();
+            alert('Failed to load reports: ' + error.message);
+        }
+    } catch (error) {
+        alert('Failed to load reports: ' + error.message);
+    } finally {
+        loadingDiv.style.display = 'none';
+        contentDiv.style.display = 'block';
+    }
+}
+
+function displayReports(data) {
+    displayReportsSummary(data.summary);
+    displayMemberReports(data.memberReports);
+}
+
+function displayReportsSummary(summary) {
+    const summaryDiv = document.getElementById('reportsSummary');
+    
+    summaryDiv.innerHTML = `
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">${summary.totalMembers}</h4>
+                            <p class="mb-0">Total Members</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">${summary.totalTasks}</h4>
+                            <p class="mb-0">Total Tasks</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-tasks fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">${summary.completedTasks}</h4>
+                            <p class="mb-0">Completed</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-check-circle fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 class="mb-0">${summary.overallCompletionRate}%</h4>
+                            <p class="mb-0">Completion Rate</p>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-chart-pie fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function displayMemberReports(memberReports) {
+    const tbody = document.getElementById('memberReportsBody');
+    
+    if (!memberReports || memberReports.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No data available for the selected period</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = memberReports.map(report => `
+        <tr>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="avatar-circle bg-primary text-white me-2" style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px;">
+                        ${report.user.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                        <div class="fw-bold">${report.user.name}</div>
+                        <small class="text-muted">${report.user.role}</small>
+                    </div>
+                </div>
+            </td>
+            <td>${report.user.department}</td>
+            <td><span class="badge bg-primary">${report.totalTasks}</span></td>
+            <td><span class="badge bg-success">${report.statusCounts.completed}</span></td>
+            <td><span class="badge bg-warning">${report.statusCounts.pending}</span></td>
+            <td><span class="badge bg-info">${report.statusCounts['in-progress']}</span></td>
+            <td>
+                <div class="d-flex align-items-center">
+                    <div class="progress me-2" style="width: 60px; height: 8px;">
+                        <div class="progress-bar bg-success" style="width: ${report.completionRate}%"></div>
+                    </div>
+                    <span class="small">${report.completionRate}%</span>
+                </div>
+            </td>
+            <td>${report.avgCompletionTime > 0 ? report.avgCompletionTime + ' days' : 'N/A'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick="showMemberDetail('${report.user.id}', '${report.user.name}')">
+                    <i class="fas fa-eye"></i> View
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showMemberDetail(userId, userName) {
+    const memberReport = currentReportsData.memberReports.find(r => r.user.id === userId);
+    if (!memberReport) return;
+    
+    const modal = new bootstrap.Modal(document.getElementById('memberDetailModal'));
+    document.getElementById('memberDetailTitle').textContent = `${userName} - Task Details`;
+    
+    const content = document.getElementById('memberDetailContent');
+    content.innerHTML = `
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Task Status Breakdown</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-success">${memberReport.statusCounts.completed}</div>
+                                    <div class="small text-muted">Completed</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-warning">${memberReport.statusCounts.pending}</div>
+                                    <div class="small text-muted">Pending</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-info">${memberReport.statusCounts['in-progress']}</div>
+                                    <div class="small text-muted">In Progress</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-danger">${memberReport.statusCounts.cancelled}</div>
+                                    <div class="small text-muted">Cancelled</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">Priority Distribution</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-danger">${memberReport.priorityCounts.urgent}</div>
+                                    <div class="small text-muted">Urgent</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-warning">${memberReport.priorityCounts.high}</div>
+                                    <div class="small text-muted">High</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-info">${memberReport.priorityCounts.medium}</div>
+                                    <div class="small text-muted">Medium</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <div class="h4 text-success">${memberReport.priorityCounts.low}</div>
+                                    <div class="small text-muted">Low</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">Recent Tasks</h6>
+            </div>
+            <div class="card-body">
+                ${memberReport.recentTasks.length > 0 ? `
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Task</th>
+                                    <th>Status</th>
+                                    <th>Priority</th>
+                                    <th>Created</th>
+                                    <th>Due Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${memberReport.recentTasks.map(task => `
+                                    <tr>
+                                        <td>${task.title}</td>
+                                        <td><span class="badge bg-${getStatusColor(task.status)}">${task.status.toUpperCase()}</span></td>
+                                        <td><span class="badge bg-${getPriorityColor(task.priority)}">${task.priority.toUpperCase()}</span></td>
+                                        <td>${new Date(task.createdAt).toLocaleDateString()}</td>
+                                        <td>${new Date(task.dueDate).toLocaleDateString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                ` : '<p class="text-muted">No recent tasks found</p>'}
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+}
+
+function exportReports() {
+    if (!currentReportsData) {
+        alert('No data to export');
+        return;
+    }
+    
+    // Create CSV content
+    const headers = ['Member Name', 'Department', 'Role', 'Total Tasks', 'Completed', 'Pending', 'In Progress', 'Cancelled', 'Completion Rate (%)', 'Avg Completion Days'];
+    const csvContent = [
+        headers.join(','),
+        ...currentReportsData.memberReports.map(report => [
+            `"${report.user.name}"`,
+            `"${report.user.department}"`,
+            `"${report.user.role}"`,
+            report.totalTasks,
+            report.statusCounts.completed,
+            report.statusCounts.pending,
+            report.statusCounts['in-progress'],
+            report.statusCounts.cancelled,
+            report.completionRate,
+            report.avgCompletionTime
+        ].join(','))
+    ].join('\n');
+    
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `member-reports-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
 }
