@@ -185,7 +185,12 @@ curl -X POST https://your-app.railway.app/api/auth/register \
    - Check server logs
    - Ensure QR code generation works
 
-3. **Database connection failed:**
+3. **Puppeteer/Chrome launch errors:**
+   - The Dockerfile is configured for containerized environments
+   - Uses system Chrome instead of bundled Chromium
+   - Includes all necessary dependencies for headless browser operation
+
+4. **Database connection failed:**
    - Verify MongoDB Atlas IP whitelist
    - Check connection string format
 
