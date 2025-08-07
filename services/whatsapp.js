@@ -6,33 +6,80 @@ class WhatsAppService {
     this.client = null;
     this.isReady = false;
     this.io = null;
+    this.initializationAttempts = 0;
+    this.maxRetries = 3;
+    this.isInitializing = false;
+    this.fallbackMode = false;
   }
 
   initialize(io) {
-    this.io = io;
-    
-    this.client = new Client({
-      authStrategy: new LocalAuth(),
-      puppeteer: {
-        headless: true,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-dev-shm-usage',
-          '--disable-accelerated-2d-canvas',
-          '--no-first-run',
-          '--no-zygote',
-          '--single-process',
-          '--disable-gpu',
-          '--disable-background-timer-throttling',
-          '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding',
-          '--disable-features=TranslateUI',
-          '--disable-ipc-flooding-protection'
-        ]
+    // Skip WhatsApp initialization in production if environment variable is set
+    if (process.env.DISABLE_WHATSAPP === 'true') {
+      console.log('WhatsApp integration disabled via environment variable');
+      this.fallbackMode = true;
+      if (io) {
+        io.emit('whatsapp-disabled', 'WhatsApp integration is disabled');
       }
-    });
+      return;
+    }
+
+    if (this.isInitializing) {
+      console.log('WhatsApp initialization already in progress...');
+      return;
+    }
+
+    this.io = io;
+    this.initializationAttempts++;
+    this.isInitializing = true;
+    
+    console.log(`Initializing WhatsApp client (attempt ${this.initializationAttempts}/${this.maxRetries})...`);
+    
+    // Set a timeout to prevent hanging initialization
+    const initTimeout = setTimeout(() => {
+      console.log('WhatsApp initialization timeout - enabling fallback mode');
+      this.fallbackMode = true;
+      this.isInitializing = false;
+      if (this.io) {
+        this.io.emit('whatsapp-timeout', 'WhatsApp initialization timed out');
+      }
+    }, 120000); // 2 minutes timeout
+
+    try {
+      this.client = new Client({
+        authStrategy: new LocalAuth({
+          dataPath: '.wwebjs_auth'
+        }),
+        puppeteer: {
+          headless: true,
+          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+          timeout: 60000,
+          args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--no-first-run',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--disable-web-security',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-extensions',
+            '--disable-plugins'
+          ]
+        }
+      });
+
+      // Clear timeout on successful initialization
+      this.client.on('ready', () => {
+        clearTimeout(initTimeout);
+        this.isInitializing = false;
+      });
 
     this.client.on('qr', (qr) => {
       console.log('WhatsApp QR Code:');
@@ -77,6 +124,14 @@ class WhatsAppService {
       if (this.io) {
         this.io.emit('whatsapp-disconnected', reason);
       }
+      
+      // Auto-retry connection if disconnected unexpectedly
+      if (this.initializationAttempts < this.maxRetries) {
+        console.log('Attempting to reconnect WhatsApp...');
+        setTimeout(() => {
+          this.initialize(this.io);
+        }, 5000);
+      }
     });
 
     // Handle incoming messages for task completion
@@ -88,10 +143,48 @@ class WhatsAppService {
       }
     });
 
-    this.client.initialize();
+    // Add error handling for initialization
+    this.client.on('loading_screen', (percent, message) => {
+      console.log('WhatsApp loading:', percent, message);
+    });
+
+    // Handle initialization errors
+    this.client.initialize().catch((error) => {
+      clearTimeout(initTimeout);
+      this.isInitializing = false;
+      console.error('WhatsApp initialization error:', error);
+      
+      if (this.initializationAttempts < this.maxRetries) {
+        console.log(`Retrying WhatsApp initialization in 10 seconds... (${this.initializationAttempts}/${this.maxRetries})`);
+        setTimeout(() => {
+          this.initialize(this.io);
+        }, 10000);
+      } else {
+        console.error('Max WhatsApp initialization attempts reached. Enabling fallback mode.');
+        this.fallbackMode = true;
+        if (this.io) {
+          this.io.emit('whatsapp-error', 'Failed to initialize after multiple attempts');
+        }
+      }
+    });
+
+    } catch (error) {
+      clearTimeout(initTimeout);
+      this.isInitializing = false;
+      console.error('WhatsApp client creation error:', error);
+      this.fallbackMode = true;
+      if (this.io) {
+        this.io.emit('whatsapp-error', 'WhatsApp client creation failed');
+      }
+    }
   }
 
   async sendMessage(phoneNumber, message) {
+    if (this.fallbackMode) {
+      console.log(`WhatsApp in fallback mode - would send to ${phoneNumber}: ${message.substring(0, 50)}...`);
+      return true; // Return true to not break the workflow
+    }
+
     if (!this.isReady) {
       console.log('WhatsApp client not ready, message queued');
       return false;

@@ -46,8 +46,14 @@ io.on('connection', (socket) => {
   });
 });
 
-// Initialize WhatsApp service
-whatsappService.initialize(io);
+// Initialize WhatsApp service with error handling
+try {
+  console.log('Attempting to initialize WhatsApp service...');
+  whatsappService.initialize(io);
+} catch (error) {
+  console.error('WhatsApp service initialization failed:', error);
+  console.log('Application will continue without WhatsApp integration');
+}
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {

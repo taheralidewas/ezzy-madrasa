@@ -46,7 +46,10 @@
    MONGODB_URI=mongodb://[your-railway-mongodb-connection]
    JWT_SECRET=your-super-secure-jwt-secret-key-here
    NODE_ENV=production
+   DISABLE_WHATSAPP=true
    ```
+   
+   **Note:** WhatsApp is disabled initially to ensure successful deployment. You can enable it later by setting `DISABLE_WHATSAPP=false` once the app is stable.
 
 5. **Create Admin User:**
    - After deployment, run the user creation script via Railway console

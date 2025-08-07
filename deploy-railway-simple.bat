@@ -16,6 +16,10 @@ echo Step 6: Set environment variables:
 echo   - MONGODB_URI (from Railway MongoDB)
 echo   - JWT_SECRET=ezzy-madrasa-super-secret-jwt-key-2024
 echo   - NODE_ENV=production
+echo   - DISABLE_WHATSAPP=true (for initial deployment)
+echo.
+echo Note: WhatsApp is disabled initially to ensure successful deployment.
+echo You can enable it later by setting DISABLE_WHATSAPP=false
 echo.
 echo 🌍 Your app will be live globally!
 echo 📱 Accessible from any device worldwide!
