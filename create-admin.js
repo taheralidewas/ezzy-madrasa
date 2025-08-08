@@ -2,13 +2,24 @@ const mongoose = require('mongoose');
 const User = require('./models/User');
 require('dotenv').config();
 
+/**
+ * Ezzy Madrasa User Creation Script
+ * 
+ * This script creates default users for the Ezzy Madrasa Task Management System.
+ * It includes one admin user and all team members with their actual WhatsApp numbers.
+ * 
+ * Usage: node create-admin.js
+ */
+
 async function createUsers() {
   try {
+    console.log('🔄 Connecting to MongoDB...');
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/work-dashboard');
     
-    // Clear existing users
+    console.log('🗑️  Clearing existing users...');
     await User.deleteMany({});
     
+    console.log('👤 Creating Admin User...');
     // Create Admin User
     const adminUser = new User({
       name: 'Ezzy Madrasa Admin',
@@ -19,6 +30,7 @@ async function createUsers() {
       department: 'Administration'
     });
 
+    console.log('👥 Creating Team Members...');
     // Create all the members with their actual WhatsApp numbers
     const members = [
       {
@@ -65,25 +77,40 @@ async function createUsers() {
 
     // Save admin user
     await adminUser.save();
+    console.log('✅ Admin user created successfully');
     
     // Save all members
+    console.log('💾 Saving team members...');
     for (const memberData of members) {
       const member = new User(memberData);
       await member.save();
+      console.log(`   ✅ ${memberData.name} created`);
     }
     
-    console.log('✅ Ezzy Madrasa users created successfully!\n');
-    console.log('👤 Admin Login:');
-    console.log('   Email: admin@ezzymadrasa.com');
-    console.log('   Password: admin123\n');
+    console.log('\n🎉 Ezzy Madrasa users created successfully!\n');
+    console.log('=' .repeat(60));
+    console.log('👤 ADMIN LOGIN CREDENTIALS:');
+    console.log('=' .repeat(60));
+    console.log('   📧 Email: admin@ezzymadrasa.com');
+    console.log('   🔑 Password: admin123');
+    console.log('   🌐 Live URL: https://ezzy-madrasa-production-up.railway.app\n');
     
-    console.log('👥 Members created:');
+    console.log('=' .repeat(60));
+    console.log('👥 TEAM MEMBERS CREATED:');
+    console.log('=' .repeat(60));
     members.forEach(member => {
-      console.log(`   📱 ${member.name}: ${member.email} (${member.phone})`);
+      console.log(`   📱 ${member.name}`);
+      console.log(`      📧 Email: ${member.email}`);
+      console.log(`      📞 Phone: ${member.phone}`);
+      console.log('');
     });
     
-    console.log('\n🎯 All members can login with password: member123');
+    console.log('🎯 All members can login with password: member123');
     console.log('📱 WhatsApp notifications will be sent to their actual numbers');
+    console.log('\n💡 Next Steps:');
+    console.log('   1. Visit: https://ezzy-madrasa-production-up.railway.app');
+    console.log('   2. Login as admin to assign tasks');
+    console.log('   3. Connect WhatsApp for notifications');
     
     process.exit(0);
   } catch (error) {

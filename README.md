@@ -1,6 +1,6 @@
-# Work Assignment Dashboard with WhatsApp Notifications
+# Ezzy Madrasa Task Management System
 
-A role-based work assignment system that sends WhatsApp notifications when work is assigned or updated.
+A role-based work assignment system specifically designed for Ezzy Madrasa that sends WhatsApp notifications when work is assigned or updated.
 
 ## Features
 
@@ -27,7 +27,13 @@ cp .env.example .env
 ### 3. Database Setup
 Make sure MongoDB is running on your system or update the `MONGODB_URI` in `.env`
 
-### 4. Start the Application
+### 4. Create Users
+Before starting the application, create the default users:
+```bash
+node create-admin.js
+```
+
+### 5. Start the Application
 ```bash
 npm start
 ```
@@ -37,7 +43,7 @@ For development with auto-restart:
 npm run dev
 ```
 
-### 5. WhatsApp Setup
+### 6. WhatsApp Setup
 1. Open the application in your browser (http://localhost:3000)
 2. Check the console for WhatsApp QR code
 3. Scan the QR code with your WhatsApp mobile app
@@ -74,18 +80,37 @@ npm run dev
 - `POST /api/work/:id/notes` - Add notes to work
 - `GET /api/work/users` - Get users for assignment
 
-## Sample User Creation
+## Default Login Credentials
 
-You can create users by making POST requests to `/api/auth/register`:
+After running `node create-admin.js`, you can log in with these credentials:
+
+### Admin Login
+- **Email**: `admin@ezzymadrasa.com`
+- **Password**: `admin123`
+
+### Member Logins (All use password: `member123`)
+- **Ali Akbar Bhai**: `ali.akbar@ezzymadrasa.com`
+- **Juzer Bhai**: `juzer@ezzymadrasa.com`
+- **Taher Bhai Umrethwala**: `taher.umrethwala@ezzymadrasa.com`
+- **Kausa Bhai**: `kausa@ezzymadrasa.com`
+- **Taher Bhai Shajapurwala**: `taher.shajapurwala@ezzymadrasa.com`
+
+## Live Application
+
+The application is deployed at: **https://ezzy-madrasa-production-up.railway.app**
+
+## Creating Additional Users
+
+You can create additional users by making POST requests to `/api/auth/register`:
 
 ```json
 {
-  "name": "John Doe",
-  "email": "john@example.com",
+  "name": "New Member",
+  "email": "newmember@ezzymadrasa.com",
   "password": "password123",
-  "role": "admin",
-  "phone": "1234567890",
-  "department": "IT"
+  "role": "member",
+  "phone": "919876543210",
+  "department": "Education"
 }
 ```
 
