@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
 const workRoutes = require('./routes/work');
+const setupRoutes = require('./routes/setup');
 const whatsappService = require('./services/whatsapp');
 
 const app = express();
@@ -36,6 +37,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/work-dash
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/work', workRoutes);
+app.use('/setup', setupRoutes);
 
 // Socket.io connection
 io.on('connection', (socket) => {
