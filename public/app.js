@@ -403,16 +403,21 @@ async function checkWhatsAppStatus() {
             console.log('WhatsApp Status:', status);
             
             if (status.fallbackMode) {
-                showWhatsAppStatus('WhatsApp is in fallback mode. Try restarting.', 'warning');
+                showWhatsAppStatus('WhatsApp is in fallback mode. Click Reset Service to fix.', 'warning');
                 const qrContainer = document.getElementById('qrCodeContainer');
                 if (qrContainer) {
                     qrContainer.innerHTML = `
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i> WhatsApp is in fallback mode
                         </div>
-                        <button class="btn btn-warning" onclick="restartWhatsApp()">
-                            <i class="fas fa-redo"></i> Restart WhatsApp
-                        </button>
+                        <div class="mt-3">
+                            <button class="btn btn-danger btn-sm me-2" onclick="resetWhatsAppService()">
+                                <i class="fas fa-power-off"></i> Reset Service
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+                                <i class="fas fa-redo"></i> Restart WhatsApp
+                            </button>
+                        </div>
                     `;
                 }
             } else if (!status.isInitializing && !status.isReady) {
