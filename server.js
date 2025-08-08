@@ -39,6 +39,102 @@ app.use('/api/auth', authRoutes);
 app.use('/api/work', workRoutes);
 app.use('/setup', setupRoutes);
 
+// Quick setup endpoint for creating users
+app.post('/api/setup-users', async (req, res) => {
+  try {
+    const User = require('./models/User');
+    
+    // Check if admin already exists
+    const existingAdmin = await User.findOne({ email: 'admin@ezzymadrasa.com' });
+    if (existingAdmin) {
+      return res.json({ 
+        success: false,
+        message: 'Users already exist. You can login with admin@ezzymadrasa.com / admin123'
+      });
+    }
+
+    // Clear existing users
+    await User.deleteMany({});
+    
+    // Create Admin User
+    const adminUser = new User({
+      name: 'Ezzy Madrasa Admin',
+      email: 'admin@ezzymadrasa.com',
+      password: 'admin123',
+      role: 'admin',
+      phone: '919876543210',
+      department: 'Administration'
+    });
+
+    // Create members
+    const members = [
+      {
+        name: 'Ali Akbar Bhai',
+        email: 'ali.akbar@ezzymadrasa.com',
+        password: 'member123',
+        role: 'member',
+        phone: '917888177802',
+        department: 'Education'
+      },
+      {
+        name: 'Juzer Bhai',
+        email: 'juzer@ezzymadrasa.com',
+        password: 'member123',
+        role: 'member',
+        phone: '919920929383',
+        department: 'Education'
+      },
+      {
+        name: 'Taher Bhai Umrethwala',
+        email: 'taher.umrethwala@ezzymadrasa.com',
+        password: 'member123',
+        role: 'member',
+        phone: '919702973900',
+        department: 'Education'
+      },
+      {
+        name: 'Kausa Bhai',
+        email: 'kausa@ezzymadrasa.com',
+        password: 'member123',
+        role: 'member',
+        phone: '919224604059',
+        department: 'Education'
+      },
+      {
+        name: 'Taher Bhai Shajapurwala',
+        email: 'taher.shajapurwala@ezzymadrasa.com',
+        password: 'member123',
+        role: 'member',
+        phone: '918770576053',
+        department: 'Education'
+      }
+    ];
+
+    // Save admin user
+    await adminUser.save();
+    
+    // Save all members
+    for (const memberData of members) {
+      const member = new User(memberData);
+      await member.save();
+    }
+    
+    res.json({
+      success: true,
+      message: 'All users created successfully!',
+      admin: { email: 'admin@ezzymadrasa.com', password: 'admin123' },
+      membersCount: members.length,
+      memberPassword: 'member123'
+    });
+  } catch (error) {
+    console.error('Setup error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to create users: ' + error.message 
+    });
+  }
+});
+
 // Socket.io connection
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
