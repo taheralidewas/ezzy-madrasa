@@ -24,20 +24,74 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Database connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/work-dashboard', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => {
-  console.log('Connected to MongoDB');
-}).catch((error) => {
-  console.error('MongoDB connection error:', error);
+// Database connection with better configuration
+const connectDB = async () => {
+  try {
+    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/work-dashboard';
+    console.log('Attempting to connect to MongoDB...');
+    console.log('MongoDB URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')); // Hide credentials in logs
+    
+    await mongoose.connect(mongoURI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverSelectionTimeoutMS: 30000, // 30 seconds
+      socketTimeoutMS: 45000, // 45 seconds
+      bufferMaxEntries: 0,
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      maxIdleTimeMS: 30000,
+      waitQueueTimeoutMS: 5000,
+      retryWrites: true,
+      w: 'majority'
+    });
+    
+    console.log('✅ Connected to MongoDB successfully');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    console.error('Full error:', error);
+    // Don't exit the process, let the app continue without DB for now
+  }
+};
+
+// Connect to database
+connectDB();
+
+// Handle connection events
+mongoose.connection.on('connected', () => {
+  console.log('🔗 Mongoose connected to MongoDB');
+});
+
+mongoose.connection.on('error', (err) => {
+  console.error('🚨 Mongoose connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('🔌 Mongoose disconnected from MongoDB');
 });
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/work', workRoutes);
 app.use('/setup', setupRoutes);
+
+// Database status endpoint for debugging
+app.get('/api/db-status', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const states = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
+  
+  res.json({
+    status: states[dbState] || 'unknown',
+    readyState: dbState,
+    mongoURI: process.env.MONGODB_URI ? 'configured' : 'not configured',
+    host: mongoose.connection.host,
+    name: mongoose.connection.name
+  });
+});
 
 // Quick setup endpoint for creating users
 app.post('/api/setup-users', async (req, res) => {
