@@ -52,6 +52,11 @@ class WhatsAppService {
     
     console.log(`Initializing WhatsApp client (attempt ${this.initializationAttempts}/${this.maxRetries})...`);
     
+    // Notify frontend that initialization started
+    if (this.io) {
+      this.io.emit('whatsapp-initializing', 'WhatsApp client is starting...');
+    }
+    
     // Set a timeout to prevent hanging initialization
     const initTimeout = setTimeout(() => {
       console.log('WhatsApp initialization timeout - enabling fallback mode');

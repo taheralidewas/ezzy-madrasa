@@ -9,6 +9,10 @@ document.addEventListener('DOMContentLoaded', function() {
     socket = io();
     
     // Socket event listeners
+    socket.on('whatsapp-initializing', (message) => {
+        showWhatsAppStatus(message, 'info');
+    });
+    
     socket.on('whatsapp-qr', (qr) => {
         showWhatsAppStatus('Scan QR code to connect WhatsApp', 'warning');
         displayQRCode(qr);
