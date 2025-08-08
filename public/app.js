@@ -376,6 +376,9 @@ function showWhatsAppModal() {
         </div>
     `;
     
+    // Check WhatsApp status immediately
+    checkWhatsAppStatus();
+    
     // Set a timeout to show restart option if QR takes too long
     setTimeout(() => {
         const container = document.getElementById('qrCodeContainer');
@@ -383,6 +386,43 @@ function showWhatsAppModal() {
             showWhatsAppStatus('QR generation is taking longer than expected. Try restarting WhatsApp.', 'warning');
         }
     }, 15000); // Show warning after 15 seconds
+}
+
+// Function to check WhatsApp status
+async function checkWhatsAppStatus() {
+    try {
+        const response = await fetch('/api/whatsapp/status', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const status = await response.json();
+            console.log('WhatsApp Status:', status);
+            
+            if (status.fallbackMode) {
+                showWhatsAppStatus('WhatsApp is in fallback mode. Try restarting.', 'warning');
+                const qrContainer = document.getElementById('qrCodeContainer');
+                if (qrContainer) {
+                    qrContainer.innerHTML = `
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i> WhatsApp is in fallback mode
+                        </div>
+                        <button class="btn btn-warning" onclick="restartWhatsApp()">
+                            <i class="fas fa-redo"></i> Restart WhatsApp
+                        </button>
+                    `;
+                }
+            } else if (!status.isInitializing && !status.isReady) {
+                // Force restart if not initializing and not ready
+                console.log('WhatsApp not initializing, forcing restart...');
+                restartWhatsApp();
+            }
+        }
+    } catch (error) {
+        console.error('Error checking WhatsApp status:', error);
+    }
 }
 
 function displayQRCode(qrData) {
@@ -482,6 +522,38 @@ async function restartWhatsApp() {
         }
     } catch (error) {
         showWhatsAppStatus('Error restarting WhatsApp: ' + error.message, 'danger');
+    }
+}
+
+// Function to manually initialize WhatsApp
+async function initializeWhatsApp() {
+    try {
+        showWhatsAppStatus('Initializing WhatsApp service...', 'info');
+        
+        const response = await fetch('/api/whatsapp/init', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp initialization triggered. Please wait...', 'success');
+            
+            // Reset QR container to show loading
+            const qrContainer = document.getElementById('qrCodeContainer');
+            qrContainer.innerHTML = `
+                <div class="spinner-border text-success mb-3" role="status">
+                    <span class="visually-hidden">Initializing WhatsApp...</span>
+                </div>
+                <p>Initializing WhatsApp service...</p>
+            `;
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus('Failed to initialize WhatsApp: ' + error.message, 'danger');
+        }
+    } catch (error) {
+        showWhatsAppStatus('Error initializing WhatsApp: ' + error.message, 'danger');
     }
 }
 

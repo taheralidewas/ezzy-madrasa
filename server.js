@@ -102,6 +102,17 @@ app.post('/api/whatsapp/restart', (req, res) => {
   }
 });
 
+// Test endpoint to manually trigger WhatsApp initialization
+app.post('/api/whatsapp/init', (req, res) => {
+  try {
+    console.log('Manual WhatsApp initialization triggered');
+    whatsappService.initialize(io);
+    res.json({ success: true, message: 'WhatsApp initialization triggered' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Quick setup endpoint for creating users
 app.post('/api/setup-users', async (req, res) => {
   try {
