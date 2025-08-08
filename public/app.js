@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     socket.on('whatsapp-qr', (qr) => {
+        console.log('Received QR code from server:', qr ? 'QR data received' : 'No QR data');
         showWhatsAppStatus('Scan QR code to connect WhatsApp', 'warning');
         displayQRCode(qr);
         updateWhatsAppButton(false);
@@ -426,49 +427,34 @@ async function checkWhatsAppStatus() {
 }
 
 function displayQRCode(qrData) {
+    console.log('Displaying QR code:', qrData.substring(0, 50) + '...');
     const qrContainer = document.getElementById('qrCodeContainer');
     
-    // Create QR code container
+    if (!qrContainer) {
+        console.error('QR container not found!');
+        return;
+    }
+    
+    // Always use online QR generator for reliability
     qrContainer.innerHTML = `
         <div class="qr-code-display mb-3">
-            <canvas id="qrcode"></canvas>
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
+                 alt="WhatsApp QR Code" class="img-fluid border rounded" 
+                 onload="console.log('QR image loaded successfully')"
+                 onerror="console.error('QR image failed to load')">
         </div>
         <p class="text-success"><i class="fas fa-qrcode"></i> Scan this QR code with WhatsApp</p>
+        <div class="mt-3">
+            <button class="btn btn-primary btn-sm me-2" onclick="initializeWhatsApp()">
+                <i class="fas fa-play"></i> Initialize WhatsApp
+            </button>
+            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+                <i class="fas fa-redo"></i> Restart WhatsApp
+            </button>
+        </div>
     `;
     
-    // Generate QR code using qrcode.js library
-    if (typeof QRCode !== 'undefined') {
-        const canvas = document.getElementById('qrcode');
-        QRCode.toCanvas(canvas, qrData, {
-            width: 256,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#ffffff'
-            }
-        }, function (error) {
-            if (error) {
-                console.error('QR Code generation error:', error);
-                // Fallback to online QR generator
-                qrContainer.innerHTML = `
-                    <div class="qr-code-display mb-3">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
-                             alt="WhatsApp QR Code" class="img-fluid border rounded">
-                    </div>
-                    <p class="text-success"><i class="fas fa-qrcode"></i> Scan this QR code with WhatsApp</p>
-                `;
-            }
-        });
-    } else {
-        // Fallback: display QR using online QR generator
-        qrContainer.innerHTML = `
-            <div class="qr-code-display mb-3">
-                <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
-                     alt="WhatsApp QR Code" class="img-fluid border rounded">
-            </div>
-            <p class="text-success"><i class="fas fa-qrcode"></i> Scan this QR code with WhatsApp</p>
-        `;
-    }
+    console.log('QR code display updated');
 }
 
 function updateWhatsAppButton(connected) {
