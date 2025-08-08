@@ -10,6 +10,24 @@ class WhatsAppService {
     this.maxRetries = 3;
     this.isInitializing = false;
     this.fallbackMode = false;
+    this.qrGenerationStartTime = null;
+  }
+
+  // Method to clear old session data for faster QR generation
+  clearSessionData() {
+    const fs = require('fs');
+    const path = require('path');
+    
+    try {
+      const sessionPath = path.join(process.cwd(), '.wwebjs_auth');
+      if (fs.existsSync(sessionPath)) {
+        console.log('Clearing old WhatsApp session data...');
+        fs.rmSync(sessionPath, { recursive: true, force: true });
+        console.log('Session data cleared successfully');
+      }
+    } catch (error) {
+      console.log('Could not clear session data:', error.message);
+    }
   }
 
   initialize(io) {
@@ -42,7 +60,7 @@ class WhatsAppService {
       if (this.io) {
         this.io.emit('whatsapp-timeout', 'WhatsApp initialization timed out');
       }
-    }, 120000); // 2 minutes timeout
+    }, 60000); // Reduced to 1 minute timeout
 
     try {
       this.client = new Client({
@@ -52,7 +70,7 @@ class WhatsAppService {
         puppeteer: {
           headless: true,
           executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-          timeout: 60000,
+          timeout: 30000, // Reduced from 60000
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -70,9 +88,21 @@ class WhatsAppService {
             '--disable-web-security',
             '--disable-features=VizDisplayCompositor',
             '--disable-extensions',
-            '--disable-plugins'
+            '--disable-plugins',
+            '--disable-images',
+            '--disable-javascript',
+            '--disable-plugins-discovery',
+            '--disable-preconnect',
+            '--disable-sync',
+            '--no-default-browser-check',
+            '--no-pings',
+            '--media-cache-size=1',
+            '--disk-cache-size=1'
           ]
-        }
+        },
+        qrMaxRetries: 3, // Limit QR retries
+        takeoverOnConflict: true, // Handle session conflicts faster
+        takeoverTimeoutMs: 10000 // Faster takeover timeout
       });
 
       // Clear timeout on successful initialization
@@ -82,12 +112,13 @@ class WhatsAppService {
       });
 
     this.client.on('qr', (qr) => {
-      console.log('WhatsApp QR Code:');
+      console.log('WhatsApp QR Code generated successfully');
       qrcode.generate(qr, { small: true });
       
-      // Send QR to frontend
+      // Send QR to frontend immediately
       if (this.io) {
         this.io.emit('whatsapp-qr', qr);
+        console.log('QR code sent to frontend');
       }
     });
 
@@ -300,10 +331,41 @@ class WhatsAppService {
     }
   }
 
+  // Method to force restart WhatsApp client for faster QR generation
+  async forceRestart() {
+    console.log('Force restarting WhatsApp client...');
+    
+    // Clear session data first
+    this.clearSessionData();
+    
+    // Reset state
+    this.isReady = false;
+    this.isInitializing = false;
+    this.initializationAttempts = 0;
+    this.fallbackMode = false;
+    
+    // Destroy existing client
+    if (this.client) {
+      try {
+        await this.client.destroy();
+      } catch (error) {
+        console.log('Error destroying client:', error.message);
+      }
+      this.client = null;
+    }
+    
+    // Reinitialize
+    setTimeout(() => {
+      this.initialize(this.io);
+    }, 1000);
+  }
+
   getStatus() {
     return {
       isReady: this.isReady,
-      clientState: this.client ? this.client.info : null
+      clientState: this.client ? this.client.info : null,
+      isInitializing: this.isInitializing,
+      fallbackMode: this.fallbackMode
     };
   }
 }

@@ -28,6 +28,36 @@ document.addEventListener('DOMContentLoaded', function() {
         updateWhatsAppButton(false);
     });
     
+    socket.on('whatsapp-timeout', () => {
+        showWhatsAppStatus('WhatsApp initialization timed out. Try restarting.', 'warning');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> QR generation timed out
+                </div>
+                <button class="btn btn-warning" onclick="restartWhatsApp()">
+                    <i class="fas fa-redo"></i> Restart WhatsApp
+                </button>
+            `;
+        }
+    });
+    
+    socket.on('whatsapp-error', (error) => {
+        showWhatsAppStatus('WhatsApp error: ' + error, 'danger');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> ${error}
+                </div>
+                <button class="btn btn-warning" onclick="restartWhatsApp()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            `;
+        }
+    });
+    
     // Handle real-time work completion updates
     socket.on('work-completed', (data) => {
         showNotification(`✅ Task "${data.title}" completed by ${data.completedBy}`, 'success');
@@ -335,7 +365,20 @@ function showWhatsAppModal() {
             <span class="visually-hidden">Generating QR Code...</span>
         </div>
         <p>Generating QR Code...</p>
+        <div class="mt-3">
+            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+                <i class="fas fa-redo"></i> Restart WhatsApp (if taking too long)
+            </button>
+        </div>
     `;
+    
+    // Set a timeout to show restart option if QR takes too long
+    setTimeout(() => {
+        const container = document.getElementById('qrCodeContainer');
+        if (container && container.innerHTML.includes('Generating QR Code')) {
+            showWhatsAppStatus('QR generation is taking longer than expected. Try restarting WhatsApp.', 'warning');
+        }
+    }, 15000); // Show warning after 15 seconds
 }
 
 function displayQRCode(qrData) {
@@ -403,6 +446,38 @@ function hideQRModal() {
     const modal = bootstrap.Modal.getInstance(document.getElementById('whatsappQRModal'));
     if (modal) {
         modal.hide();
+    }
+}
+
+// Function to restart WhatsApp service for faster QR generation
+async function restartWhatsApp() {
+    try {
+        showWhatsAppStatus('Restarting WhatsApp service...', 'info');
+        
+        const response = await fetch('/api/whatsapp/restart', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp service restarted. Generating new QR code...', 'success');
+            
+            // Reset QR container to show loading
+            const qrContainer = document.getElementById('qrCodeContainer');
+            qrContainer.innerHTML = `
+                <div class="spinner-border text-success mb-3" role="status">
+                    <span class="visually-hidden">Generating QR Code...</span>
+                </div>
+                <p>Generating new QR Code...</p>
+            `;
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus('Failed to restart WhatsApp: ' + error.message, 'danger');
+        }
+    } catch (error) {
+        showWhatsAppStatus('Error restarting WhatsApp: ' + error.message, 'danger');
     }
 }
 

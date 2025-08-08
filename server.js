@@ -88,6 +88,20 @@ app.get('/api/db-status', (req, res) => {
   });
 });
 
+// WhatsApp status and control endpoints
+app.get('/api/whatsapp/status', (req, res) => {
+  res.json(whatsappService.getStatus());
+});
+
+app.post('/api/whatsapp/restart', (req, res) => {
+  try {
+    whatsappService.forceRestart();
+    res.json({ success: true, message: 'WhatsApp client restart initiated' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Quick setup endpoint for creating users
 app.post('/api/setup-users', async (req, res) => {
   try {
