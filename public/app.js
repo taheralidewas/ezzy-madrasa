@@ -543,6 +543,38 @@ async function initializeWhatsApp() {
     }
 }
 
+// Function to reset WhatsApp service completely (get out of fallback mode)
+async function resetWhatsAppService() {
+    try {
+        showWhatsAppStatus('Resetting WhatsApp service completely...', 'info');
+        
+        const response = await fetch('/api/whatsapp/reset', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp service reset successfully. Generating QR code...', 'success');
+            
+            // Reset QR container to show loading
+            const qrContainer = document.getElementById('qrCodeContainer');
+            qrContainer.innerHTML = `
+                <div class="spinner-border text-success mb-3" role="status">
+                    <span class="visually-hidden">Resetting and generating QR...</span>
+                </div>
+                <p>Service reset complete. Generating new QR code...</p>
+            `;
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus('Failed to reset WhatsApp service: ' + error.message, 'danger');
+        }
+    } catch (error) {
+        showWhatsAppStatus('Error resetting WhatsApp service: ' + error.message, 'danger');
+    }
+}
+
 // Reports Functions
 let currentReportsData = null;
 

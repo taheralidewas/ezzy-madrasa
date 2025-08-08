@@ -113,6 +113,21 @@ app.post('/api/whatsapp/init', (req, res) => {
   }
 });
 
+// Endpoint to reset WhatsApp service completely (get out of fallback mode)
+app.post('/api/whatsapp/reset', (req, res) => {
+  try {
+    console.log('Complete WhatsApp service reset triggered');
+    whatsappService.resetService();
+    // Initialize after reset
+    setTimeout(() => {
+      whatsappService.initialize(io);
+    }, 1000);
+    res.json({ success: true, message: 'WhatsApp service reset and reinitialized' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Quick setup endpoint for creating users
 app.post('/api/setup-users', async (req, res) => {
   try {

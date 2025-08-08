@@ -20,13 +20,47 @@ class WhatsAppService {
     
     try {
       const sessionPath = path.join(process.cwd(), '.wwebjs_auth');
+      const cachePath = path.join(process.cwd(), '.wwebjs_cache');
+      
+      // Clear session data
       if (fs.existsSync(sessionPath)) {
         console.log('Clearing old WhatsApp session data...');
-        fs.rmSync(sessionPath, { recursive: true, force: true });
-        console.log('Session data cleared successfully');
+        try {
+          fs.rmSync(sessionPath, { recursive: true, force: true });
+          console.log('Session data cleared successfully');
+        } catch (error) {
+          console.log('Could not clear session data completely:', error.message);
+          // Try to clear individual files
+          try {
+            const files = fs.readdirSync(sessionPath, { recursive: true });
+            files.forEach(file => {
+              try {
+                const filePath = path.join(sessionPath, file);
+                if (fs.statSync(filePath).isFile()) {
+                  fs.unlinkSync(filePath);
+                }
+              } catch (e) {
+                // Ignore individual file errors
+              }
+            });
+          } catch (e) {
+            console.log('Could not clear individual files');
+          }
+        }
+      }
+      
+      // Clear cache data
+      if (fs.existsSync(cachePath)) {
+        console.log('Clearing WhatsApp cache...');
+        try {
+          fs.rmSync(cachePath, { recursive: true, force: true });
+          console.log('Cache cleared successfully');
+        } catch (error) {
+          console.log('Could not clear cache:', error.message);
+        }
       }
     } catch (error) {
-      console.log('Could not clear session data:', error.message);
+      console.log('Error in clearSessionData:', error.message);
     }
   }
 
@@ -343,11 +377,12 @@ class WhatsAppService {
     // Clear session data first
     this.clearSessionData();
     
-    // Reset state
+    // Reset ALL state variables
     this.isReady = false;
     this.isInitializing = false;
     this.initializationAttempts = 0;
-    this.fallbackMode = false;
+    this.fallbackMode = false; // This is crucial!
+    this.qrGenerationStartTime = null;
     
     // Destroy existing client
     if (this.client) {
@@ -359,10 +394,34 @@ class WhatsAppService {
       this.client = null;
     }
     
-    // Reinitialize
+    // Notify frontend that we're restarting
+    if (this.io) {
+      this.io.emit('whatsapp-initializing', 'Restarting WhatsApp service...');
+    }
+    
+    // Reinitialize after a short delay
     setTimeout(() => {
+      console.log('Starting fresh WhatsApp initialization...');
       this.initialize(this.io);
-    }, 1000);
+    }, 2000);
+  }
+
+  // Method to completely reset WhatsApp service
+  resetService() {
+    console.log('Resetting WhatsApp service completely...');
+    
+    // Reset all state
+    this.isReady = false;
+    this.isInitializing = false;
+    this.initializationAttempts = 0;
+    this.fallbackMode = false;
+    this.qrGenerationStartTime = null;
+    this.client = null;
+    
+    // Clear session data
+    this.clearSessionData();
+    
+    console.log('WhatsApp service reset complete');
   }
 
   getStatus() {
