@@ -84,6 +84,31 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
     });
+
+    socket.on('whatsapp-disabled', (message) => {
+        showWhatsAppStatus(message, 'info');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> WhatsApp Integration Disabled
+                    <hr>
+                    <p class="mb-2"><strong>Production Mode:</strong> WhatsApp is disabled in production for stability and resource optimization.</p>
+                    <p class="mb-2"><strong>Task Management:</strong> All other features work normally - you can still assign tasks, track progress, and generate reports.</p>
+                    <p class="mb-0"><strong>Notifications:</strong> Users will need to check the dashboard for task updates.</p>
+                </div>
+                <div class="mt-3">
+                    <small class="text-muted">
+                        <i class="fas fa-lightbulb"></i> 
+                        <strong>Tip:</strong> For WhatsApp integration, run the application locally in development mode.
+                    </small>
+                </div>
+            `;
+        }
+        
+        // Update WhatsApp button to show disabled state
+        updateWhatsAppButton(false, true);
+    });
     
     // Handle real-time work completion updates
     socket.on('work-completed', (data) => {
@@ -494,11 +519,15 @@ function displayQRCode(qrData) {
     console.log('QR code display updated');
 }
 
-function updateWhatsAppButton(connected) {
+function updateWhatsAppButton(connected, disabled = false) {
     const btn = document.getElementById('whatsappBtn');
     const btnText = document.getElementById('whatsappBtnText');
     
-    if (connected) {
+    if (disabled) {
+        btn.className = 'btn btn-secondary me-2';
+        btnText.innerHTML = '<i class="fas fa-ban"></i> WhatsApp Disabled (Production)';
+        btn.disabled = true;
+    } else if (connected) {
         btn.className = 'btn btn-success me-2';
         btnText.innerHTML = '<i class="fas fa-check-circle"></i> WhatsApp Connected';
         btn.disabled = true;

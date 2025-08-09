@@ -28,6 +28,8 @@ async function deployRailway() {
   console.log('- MONGODB_URI=your-railway-mongodb-connection');
   console.log('- JWT_SECRET=ezzy-madrasa-super-secret-jwt-key-2024');
   console.log('- NODE_ENV=production');
+  console.log('- DISABLE_WHATSAPP=true (for production stability)');
+  console.log('- PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true');
   
   console.log('\n✅ Your app will be live at: https://your-app.railway.app');
   console.log('🌍 Accessible globally from any device!');

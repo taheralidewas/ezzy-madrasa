@@ -65,12 +65,12 @@ class WhatsAppService {
   }
 
   initialize(io) {
-    // Skip WhatsApp initialization in production if environment variable is set
-    if (process.env.DISABLE_WHATSAPP === 'true') {
-      console.log('WhatsApp integration disabled via environment variable');
+    // Skip WhatsApp initialization in production if environment variable is set or if in containerized environment
+    if (process.env.DISABLE_WHATSAPP === 'true' || process.env.NODE_ENV === 'production') {
+      console.log('WhatsApp integration disabled in production environment');
       this.fallbackMode = true;
       if (io) {
-        io.emit('whatsapp-disabled', 'WhatsApp integration is disabled');
+        io.emit('whatsapp-disabled', 'WhatsApp integration is disabled in production for stability');
       }
       return;
     }
