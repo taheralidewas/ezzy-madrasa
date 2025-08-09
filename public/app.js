@@ -363,6 +363,16 @@ function showWhatsAppModal() {
     const modal = new bootstrap.Modal(document.getElementById('whatsappQRModal'));
     modal.show();
     
+    // Fix accessibility issue by removing aria-hidden when modal is shown
+    const modalElement = document.getElementById('whatsappQRModal');
+    modalElement.addEventListener('shown.bs.modal', function () {
+        modalElement.removeAttribute('aria-hidden');
+    });
+    
+    modalElement.addEventListener('hidden.bs.modal', function () {
+        modalElement.setAttribute('aria-hidden', 'true');
+    });
+    
     // Reset QR container
     const qrContainer = document.getElementById('qrCodeContainer');
     qrContainer.innerHTML = `
