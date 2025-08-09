@@ -3,6 +3,28 @@ let currentUser = null;
 let socket = null;
 let whatsappConnected = false;
 
+// Handle browser extension errors
+window.addEventListener('unhandledrejection', function(event) {
+    if (event.reason && event.reason.message && 
+        (event.reason.message.includes('message channel closed') ||
+         event.reason.message.includes('listener indicated an asynchronous response'))) {
+        event.preventDefault();
+        console.log('Suppressed browser extension error:', event.reason.message);
+        return;
+    }
+});
+
+// Handle general errors
+window.addEventListener('error', function(event) {
+    if (event.message && 
+        (event.message.includes('message channel closed') ||
+         event.message.includes('listener indicated an asynchronous response'))) {
+        event.preventDefault();
+        console.log('Suppressed browser extension error:', event.message);
+        return;
+    }
+});
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize socket connection

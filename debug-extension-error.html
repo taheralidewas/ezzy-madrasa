@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Extension Error</title>
+</head>
+<body>
+    <h2>Browser Extension Error Debug</h2>
+    <p>If you're seeing the "message channel closed" error, try these solutions:</p>
+    
+    <h3>Solution 1: Disable Extensions</h3>
+    <ol>
+        <li>Open Chrome/Edge in Incognito mode (Ctrl+Shift+N)</li>
+        <li>Test your app - if error is gone, it's an extension issue</li>
+        <li>Go to chrome://extensions/ and disable extensions one by one</li>
+        <li>Common culprits: Ad blockers, password managers, translation tools</li>
+    </ol>
+    
+    <h3>Solution 2: Add Error Handler</h3>
+    <p>Add this to your app.js to suppress the error:</p>
+    <pre>
+// Add this at the top of app.js
+window.addEventListener('unhandledrejection', function(event) {
+    if (event.reason && event.reason.message && 
+        event.reason.message.includes('message channel closed')) {
+        event.preventDefault();
+        console.log('Suppressed extension error:', event.reason.message);
+    }
+});
+    </pre>
+    
+    <h3>Solution 3: Check for Specific Extensions</h3>
+    <ul>
+        <li>Grammarly</li>
+        <li>LastPass/1Password</li>
+        <li>AdBlock/uBlock Origin</li>
+        <li>Google Translate</li>
+        <li>Honey/Capital One Shopping</li>
+    </ul>
+    
+    <script>
+        console.log('Debug page loaded - check if extension error appears here too');
+    </script>
+</body>
+</html>
