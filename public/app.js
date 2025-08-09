@@ -3,27 +3,79 @@ let currentUser = null;
 let socket = null;
 let whatsappConnected = false;
 
-// Handle browser extension errors
-window.addEventListener('unhandledrejection', function(event) {
-    if (event.reason && event.reason.message && 
-        (event.reason.message.includes('message channel closed') ||
-         event.reason.message.includes('listener indicated an asynchronous response'))) {
-        event.preventDefault();
-        console.log('Suppressed browser extension error:', event.reason.message);
-        return;
+// Comprehensive browser extension error suppression
+(function() {
+    'use strict';
+    
+    // List of extension-related error patterns
+    const extensionErrorPatterns = [
+        'message channel closed',
+        'listener indicated an asynchronous response',
+        'Extension context invalidated',
+        'chrome-extension://',
+        'moz-extension://',
+        'safari-extension://',
+        'The message port closed before a response was received',
+        'Could not establish connection',
+        'Receiving end does not exist'
+    ];
+    
+    // Function to check if error is extension-related
+    function isExtensionError(message) {
+        if (!message) return false;
+        return extensionErrorPatterns.some(pattern => 
+            message.toLowerCase().includes(pattern.toLowerCase())
+        );
     }
-});
+    
+    // Handle unhandled promise rejections (most common source)
+    window.addEventListener('unhandledrejection', function(event) {
+        const message = event.reason?.message || event.reason?.toString() || '';
+        if (isExtensionError(message)) {
+            event.preventDefault();
+            event.stopPropagation();
+            // Optionally log for debugging (remove in production)
+            // console.log('🔇 Suppressed extension error:', message);
+            return false;
+        }
+    }, true);
 
-// Handle general errors
-window.addEventListener('error', function(event) {
-    if (event.message && 
-        (event.message.includes('message channel closed') ||
-         event.message.includes('listener indicated an asynchronous response'))) {
-        event.preventDefault();
-        console.log('Suppressed browser extension error:', event.message);
-        return;
+    // Handle general JavaScript errors
+    window.addEventListener('error', function(event) {
+        const message = event.message || event.error?.message || '';
+        if (isExtensionError(message)) {
+            event.preventDefault();
+            event.stopPropagation();
+            // Optionally log for debugging (remove in production)
+            // console.log('🔇 Suppressed extension error:', message);
+            return false;
+        }
+    }, true);
+    
+    // Override console.error to filter extension errors
+    const originalConsoleError = console.error;
+    console.error = function(...args) {
+        const message = args.join(' ');
+        if (!isExtensionError(message)) {
+            originalConsoleError.apply(console, args);
+        }
+    };
+    
+    // Suppress specific Chrome extension errors
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+        const originalSendMessage = chrome.runtime.sendMessage;
+        chrome.runtime.sendMessage = function(...args) {
+            try {
+                return originalSendMessage.apply(this, args);
+            } catch (error) {
+                if (isExtensionError(error.message)) {
+                    return Promise.resolve();
+                }
+                throw error;
+            }
+        };
     }
-});
+})();
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {

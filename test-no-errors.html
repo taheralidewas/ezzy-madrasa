@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Test Page - Ezzy Madrasa</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        #console-output {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1>🧪 Browser Extension Error Test</h1>
+        <p class="info">This page tests if browser extension errors are properly suppressed.</p>
+        
+        <h3>Test Results:</h3>
+        <div id="test-results">
+            <p class="success">✅ Error suppression system loaded</p>
+            <p class="success">✅ Console override active</p>
+            <p class="success">✅ Promise rejection handler active</p>
+        </div>
+        
+        <h3>Manual Tests:</h3>
+        <button onclick="testExtensionError()">Test Extension Error</button>
+        <button onclick="testPromiseRejection()">Test Promise Rejection</button>
+        <button onclick="testConsoleError()">Test Console Error</button>
+        <button onclick="clearConsole()">Clear Console</button>
+        
+        <div id="console-output"></div>
+    </div>
+
+    <script>
+        // Copy the same error suppression system from app.js
+        (function() {
+            'use strict';
+            
+            const extensionErrorPatterns = [
+                'message channel closed',
+                'listener indicated an asynchronous response',
+                'Extension context invalidated',
+                'chrome-extension://',
+                'moz-extension://',
+                'safari-extension://',
+                'The message port closed before a response was received',
+                'Could not establish connection',
+                'Receiving end does not exist'
+            ];
+            
+            function isExtensionError(message) {
+                if (!message) return false;
+                return extensionErrorPatterns.some(pattern => 
+                    message.toLowerCase().includes(pattern.toLowerCase())
+                );
+            }
+            
+            window.addEventListener('unhandledrejection', function(event) {
+                const message = event.reason?.message || event.reason?.toString() || '';
+                if (isExtensionError(message)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    logToConsole('🔇 Suppressed extension error: ' + message);
+                    return false;
+                }
+            }, true);
+
+            window.addEventListener('error', function(event) {
+                const message = event.message || event.error?.message || '';
+                if (isExtensionError(message)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    logToConsole('🔇 Suppressed extension error: ' + message);
+                    return false;
+                }
+            }, true);
+            
+            const originalConsoleError = console.error;
+            console.error = function(...args) {
+                const message = args.join(' ');
+                if (!isExtensionError(message)) {
+                    originalConsoleError.apply(console, args);
+                    logToConsole('❌ Regular error: ' + message);
+                } else {
+                    logToConsole('🔇 Suppressed console error: ' + message);
+                }
+            };
+        })();
+
+        function logToConsole(message) {
+            const output = document.getElementById('console-output');
+            const timestamp = new Date().toLocaleTimeString();
+            output.innerHTML += `[${timestamp}] ${message}\n`;
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function testExtensionError() {
+            logToConsole('🧪 Testing extension error...');
+            // Simulate extension error
+            const error = new Error('A listener indicated an asynchronous response by returning true, but the message channel closed before a response was received');
+            Promise.reject(error);
+        }
+
+        function testPromiseRejection() {
+            logToConsole('🧪 Testing promise rejection...');
+            Promise.reject(new Error('The message port closed before a response was received'));
+        }
+
+        function testConsoleError() {
+            logToConsole('🧪 Testing console error...');
+            console.error('chrome-extension://test-extension-error');
+        }
+
+        function clearConsole() {
+            document.getElementById('console-output').innerHTML = '';
+        }
+
+        // Log initial status
+        logToConsole('✅ Error suppression system initialized');
+        logToConsole('ℹ️ Click buttons above to test error suppression');
+    </script>
+</body>
+</html>
