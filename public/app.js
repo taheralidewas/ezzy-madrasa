@@ -420,30 +420,8 @@ function showWhatsAppModal() {
         modalElement.setAttribute('aria-hidden', 'true');
     });
     
-    // Reset QR container
-    const qrContainer = document.getElementById('qrCodeContainer');
-    qrContainer.innerHTML = `
-        <div class="spinner-border text-success mb-3" role="status">
-            <span class="visually-hidden">Generating QR Code...</span>
-        </div>
-        <p>Generating QR Code...</p>
-        <div class="mt-3">
-            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
-                <i class="fas fa-redo"></i> Restart WhatsApp (if taking too long)
-            </button>
-        </div>
-    `;
-    
-    // Check WhatsApp status immediately
+    // Check WhatsApp status first to determine what to show
     checkWhatsAppStatus();
-    
-    // Set a timeout to show restart option if QR takes too long
-    setTimeout(() => {
-        const container = document.getElementById('qrCodeContainer');
-        if (container && container.innerHTML.includes('Generating QR Code')) {
-            showWhatsAppStatus('QR generation is taking longer than expected. Try restarting WhatsApp.', 'warning');
-        }
-    }, 15000); // Show warning after 15 seconds
 }
 
 // Function to check WhatsApp status
@@ -459,7 +437,31 @@ async function checkWhatsAppStatus() {
             const status = await response.json();
             console.log('WhatsApp Status:', status);
             
-            if (status.fallbackMode) {
+            // Check if WhatsApp is disabled (production mode)
+            if (status.fallbackMode && !status.isInitializing && !status.isReady) {
+                // Show production disabled message
+                const qrContainer = document.getElementById('qrCodeContainer');
+                if (qrContainer) {
+                    qrContainer.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> WhatsApp Integration Disabled
+                            <hr>
+                            <p class="mb-2"><strong>Production Mode:</strong> WhatsApp is disabled in production for stability and resource optimization.</p>
+                            <p class="mb-2"><strong>Task Management:</strong> All other features work normally - you can still assign tasks, track progress, and generate reports.</p>
+                            <p class="mb-0"><strong>Notifications:</strong> Users will need to check the dashboard for task updates.</p>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-lightbulb"></i> 
+                                <strong>Tip:</strong> For WhatsApp integration, run the application locally in development mode.
+                            </small>
+                        </div>
+                    `;
+                }
+                showWhatsAppStatus('WhatsApp integration is disabled in production for stability', 'info');
+                updateWhatsAppButton(false, true);
+            } else if (status.fallbackMode) {
+                // Show fallback mode (development environment issue)
                 showWhatsAppStatus('WhatsApp is in fallback mode. Click Reset Service to fix.', 'warning');
                 const qrContainer = document.getElementById('qrCodeContainer');
                 if (qrContainer) {
@@ -478,13 +480,41 @@ async function checkWhatsAppStatus() {
                     `;
                 }
             } else if (!status.isInitializing && !status.isReady) {
-                // Force restart if not initializing and not ready
+                // Show loading state and try to restart
+                const qrContainer = document.getElementById('qrCodeContainer');
+                if (qrContainer) {
+                    qrContainer.innerHTML = `
+                        <div class="spinner-border text-success mb-3" role="status">
+                            <span class="visually-hidden">Generating QR Code...</span>
+                        </div>
+                        <p>Generating QR Code...</p>
+                        <div class="mt-3">
+                            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+                                <i class="fas fa-redo"></i> Restart WhatsApp (if taking too long)
+                            </button>
+                        </div>
+                    `;
+                }
                 console.log('WhatsApp not initializing, forcing restart...');
                 restartWhatsApp();
             }
         }
     } catch (error) {
         console.error('Error checking WhatsApp status:', error);
+        // Show error state
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> Unable to check WhatsApp status
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-warning btn-sm" onclick="checkWhatsAppStatus()">
+                        <i class="fas fa-redo"></i> Try Again
+                    </button>
+                </div>
+            `;
+        }
     }
 }
 
