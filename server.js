@@ -128,6 +128,59 @@ app.post('/api/whatsapp/reset', (req, res) => {
   }
 });
 
+// Diagnostic endpoint for WhatsApp troubleshooting
+app.get('/api/whatsapp/diagnostics', (req, res) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        nodeEnv: process.env.NODE_ENV,
+        disableWhatsApp: process.env.DISABLE_WHATSAPP,
+        puppeteerPath: process.env.PUPPETEER_EXECUTABLE_PATH
+      },
+      whatsappService: whatsappService.getDetailedStatus(),
+      directories: {
+        authExists: fs.existsSync('.wwebjs_auth'),
+        cacheExists: fs.existsSync('.wwebjs_cache'),
+        nodeModulesExists: fs.existsSync('node_modules'),
+        puppeteerExists: fs.existsSync('node_modules/puppeteer')
+      },
+      memory: process.memoryUsage(),
+      uptime: process.uptime()
+    };
+    
+    // Check for common issues
+    diagnostics.issues = [];
+    
+    if (!diagnostics.directories.nodeModulesExists) {
+      diagnostics.issues.push('node_modules directory missing - run npm install');
+    }
+    
+    if (!diagnostics.directories.puppeteerExists) {
+      diagnostics.issues.push('Puppeteer not installed - run npm install puppeteer');
+    }
+    
+    if (diagnostics.memory.heapUsed > 500 * 1024 * 1024) {
+      diagnostics.issues.push('High memory usage detected');
+    }
+    
+    console.log('WhatsApp Diagnostics:', JSON.stringify(diagnostics, null, 2));
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to generate diagnostics: ' + error.message,
+      error: error.stack
+    });
+  }
+});
+
 // Quick setup endpoint for creating users
 app.post('/api/setup-users', async (req, res) => {
   try {

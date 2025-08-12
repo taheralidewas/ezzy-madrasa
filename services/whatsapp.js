@@ -149,13 +149,30 @@ class WhatsAppService {
       });
 
     this.client.on('qr', (qr) => {
-      console.log('WhatsApp QR Code generated successfully');
-      qrcode.generate(qr, { small: true });
+      console.log('✅ WhatsApp QR Code generated successfully');
+      console.log('QR Code length:', qr.length);
+      console.log('QR Code preview:', qr.substring(0, 50) + '...');
+      
+      // Generate QR in terminal for debugging
+      try {
+        qrcode.generate(qr, { small: true });
+      } catch (terminalError) {
+        console.log('Terminal QR generation failed:', terminalError.message);
+      }
       
       // Send QR to frontend immediately
       if (this.io) {
         this.io.emit('whatsapp-qr', qr);
-        console.log('QR code sent to frontend');
+        console.log('✅ QR code sent to frontend via socket');
+        
+        // Also send a status update
+        this.io.emit('whatsapp-status-update', {
+          status: 'qr-ready',
+          message: 'QR Code generated successfully. Please scan with your phone.',
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        console.error('❌ Socket.io not available - cannot send QR to frontend');
       }
     });
 
@@ -216,22 +233,79 @@ class WhatsAppService {
       console.log('WhatsApp loading:', percent, message);
     });
 
-    // Handle initialization errors
+    // Add more detailed error event handlers
+    this.client.on('change_state', (state) => {
+      console.log('WhatsApp state changed:', state);
+      if (this.io) {
+        this.io.emit('whatsapp-state-change', state);
+      }
+    });
+
+    this.client.on('change_battery', (batteryInfo) => {
+      console.log('WhatsApp battery info:', batteryInfo);
+    });
+
+    // Handle initialization errors with detailed logging
     this.client.initialize().catch((error) => {
       clearTimeout(initTimeout);
       this.isInitializing = false;
-      console.error('WhatsApp initialization error:', error);
+      
+      console.error('❌ WhatsApp initialization error:');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+      
+      // Check for specific error types
+      let errorType = 'unknown';
+      let userMessage = 'Failed to initialize WhatsApp';
+      
+      if (error.message.includes('Chromium revision is not downloaded')) {
+        errorType = 'chromium-missing';
+        userMessage = 'Chromium browser not found. Please install dependencies.';
+        console.error('🔧 Solution: Run "npm install" or install Chromium manually');
+      } else if (error.message.includes('Navigation timeout')) {
+        errorType = 'navigation-timeout';
+        userMessage = 'WhatsApp Web took too long to load. Please try again.';
+        console.error('🔧 Solution: Check internet connection and try restarting');
+      } else if (error.message.includes('Protocol error')) {
+        errorType = 'protocol-error';
+        userMessage = 'Browser protocol error. Try clearing session data.';
+        console.error('🔧 Solution: Clear .wwebjs_auth folder and restart');
+      } else if (error.message.includes('ECONNREFUSED')) {
+        errorType = 'connection-refused';
+        userMessage = 'Cannot connect to WhatsApp servers. Check internet connection.';
+        console.error('🔧 Solution: Check internet connection and firewall settings');
+      }
+      
+      // Send detailed error to frontend
+      if (this.io) {
+        this.io.emit('whatsapp-detailed-error', {
+          type: errorType,
+          message: userMessage,
+          originalError: error.message,
+          attempt: this.initializationAttempts,
+          maxRetries: this.maxRetries,
+          timestamp: new Date().toISOString()
+        });
+      }
       
       if (this.initializationAttempts < this.maxRetries) {
-        console.log(`Retrying WhatsApp initialization in 10 seconds... (${this.initializationAttempts}/${this.maxRetries})`);
+        console.log(`🔄 Retrying WhatsApp initialization in 10 seconds... (${this.initializationAttempts}/${this.maxRetries})`);
+        if (this.io) {
+          this.io.emit('whatsapp-retry', {
+            attempt: this.initializationAttempts,
+            maxRetries: this.maxRetries,
+            nextRetryIn: 10
+          });
+        }
         setTimeout(() => {
           this.initialize(this.io);
         }, 10000);
       } else {
-        console.error('Max WhatsApp initialization attempts reached. Enabling fallback mode.');
+        console.error('❌ Max WhatsApp initialization attempts reached. Enabling fallback mode.');
         this.fallbackMode = true;
         if (this.io) {
-          this.io.emit('whatsapp-error', 'Failed to initialize after multiple attempts');
+          this.io.emit('whatsapp-error', `Failed to initialize after ${this.maxRetries} attempts: ${userMessage}`);
         }
       }
     });
@@ -428,6 +502,25 @@ class WhatsAppService {
       clientState: this.client ? this.client.info : null,
       isInitializing: this.isInitializing,
       fallbackMode: this.fallbackMode
+    };
+  }
+
+  getDetailedStatus() {
+    return {
+      isReady: this.isReady,
+      isInitializing: this.isInitializing,
+      fallbackMode: this.fallbackMode,
+      initializationAttempts: this.initializationAttempts,
+      maxRetries: this.maxRetries,
+      qrGenerationStartTime: this.qrGenerationStartTime,
+      clientExists: !!this.client,
+      clientState: this.client ? {
+        info: this.client.info || null,
+        pupPage: !!this.client.pupPage,
+        pupBrowser: !!this.client.pupBrowser
+      } : null,
+      lastError: this.lastError || null,
+      serviceStartTime: this.serviceStartTime || new Date().toISOString()
     };
   }
 }

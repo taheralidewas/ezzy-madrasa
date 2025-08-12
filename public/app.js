@@ -137,6 +137,108 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Handle detailed error reporting
+    socket.on('whatsapp-detailed-error', (errorData) => {
+        console.error('WhatsApp detailed error:', errorData);
+        showWhatsAppStatus(`WhatsApp Error: ${errorData.message}`, 'danger');
+        
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            let solutionHtml = '';
+            
+            // Provide specific solutions based on error type
+            switch(errorData.type) {
+                case 'chromium-missing':
+                    solutionHtml = `
+                        <div class="alert alert-info mt-2">
+                            <strong>Solution:</strong> Run <code>npm install</code> to install missing dependencies.
+                        </div>
+                    `;
+                    break;
+                case 'navigation-timeout':
+                    solutionHtml = `
+                        <div class="alert alert-info mt-2">
+                            <strong>Solution:</strong> Check your internet connection and try restarting.
+                        </div>
+                    `;
+                    break;
+                case 'protocol-error':
+                    solutionHtml = `
+                        <div class="alert alert-info mt-2">
+                            <strong>Solution:</strong> Clear session data using "Reset All" button.
+                        </div>
+                    `;
+                    break;
+                case 'connection-refused':
+                    solutionHtml = `
+                        <div class="alert alert-info mt-2">
+                            <strong>Solution:</strong> Check internet connection and firewall settings.
+                        </div>
+                    `;
+                    break;
+            }
+            
+            qrContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> <strong>WhatsApp Error</strong>
+                    <hr>
+                    <p><strong>Issue:</strong> ${errorData.message}</p>
+                    <p><strong>Attempt:</strong> ${errorData.attempt}/${errorData.maxRetries}</p>
+                    <small class="text-muted">Time: ${new Date(errorData.timestamp).toLocaleString()}</small>
+                </div>
+                ${solutionHtml}
+                <div class="btn-group mt-3" role="group">
+                    <button class="btn btn-warning" onclick="restartWhatsApp()">
+                        <i class="fas fa-redo"></i> Restart Service
+                    </button>
+                    <button class="btn btn-danger" onclick="resetWhatsAppService()">
+                        <i class="fas fa-power-off"></i> Reset All
+                    </button>
+                </div>
+                <div class="mt-2">
+                    <small class="text-muted">
+                        <strong>Debug Info:</strong> ${errorData.originalError}
+                    </small>
+                </div>
+            `;
+        }
+    });
+
+    // Handle retry notifications
+    socket.on('whatsapp-retry', (retryData) => {
+        showWhatsAppStatus(`Retrying WhatsApp connection... (${retryData.attempt}/${retryData.maxRetries})`, 'warning');
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-redo"></i> <strong>Retrying Connection</strong>
+                    <hr>
+                    <p>Attempt ${retryData.attempt} of ${retryData.maxRetries} failed.</p>
+                    <p>Next retry in ${retryData.nextRetryIn} seconds...</p>
+                    <div class="progress mt-2">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" style="width: ${(retryData.attempt/retryData.maxRetries)*100}%">
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    // Handle status updates
+    socket.on('whatsapp-status-update', (statusData) => {
+        console.log('WhatsApp status update:', statusData);
+        if (statusData.status === 'qr-ready') {
+            showWhatsAppStatus(statusData.message, 'success');
+        }
+    });
+
+    // Handle state changes
+    socket.on('whatsapp-state-change', (state) => {
+        console.log('WhatsApp state changed to:', state);
+        showWhatsAppStatus(`WhatsApp state: ${state}`, 'info');
+    });
+
     socket.on('whatsapp-disabled', (message) => {
         showWhatsAppStatus(message, 'info');
         const qrContainer = document.getElementById('qrCodeContainer');
@@ -811,6 +913,155 @@ async function resetWhatsAppService() {
         }
     } catch (error) {
         showWhatsAppStatus('Error resetting WhatsApp service: ' + error.message, 'danger');
+    }
+}
+
+// Function to run comprehensive WhatsApp diagnostics
+async function runWhatsAppDiagnostics() {
+    try {
+        showWhatsAppStatus('Running WhatsApp diagnostics...', 'info');
+        
+        const qrContainer = document.getElementById('qrCodeContainer');
+        qrContainer.innerHTML = `
+            <div class="spinner-border text-info mb-3" role="status">
+                <span class="visually-hidden">Running diagnostics...</span>
+            </div>
+            <p>Analyzing WhatsApp service...</p>
+        `;
+        
+        const response = await fetch('/api/whatsapp/diagnostics', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+        
+        if (response.ok) {
+            const diagnostics = await response.json();
+            console.log('WhatsApp Diagnostics:', diagnostics);
+            
+            showWhatsAppStatus('Diagnostics completed. Check results below.', 'success');
+            
+            // Display comprehensive diagnostics
+            let issuesHtml = '';
+            if (diagnostics.issues && diagnostics.issues.length > 0) {
+                issuesHtml = `
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-exclamation-triangle"></i> Issues Found:</h6>
+                        <ul class="mb-0">
+                            ${diagnostics.issues.map(issue => `<li>${issue}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+            
+            qrContainer.innerHTML = `
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-stethoscope"></i> WhatsApp Diagnostics Report</h6>
+                    <small class="text-muted">Generated: ${new Date(diagnostics.timestamp).toLocaleString()}</small>
+                </div>
+                
+                ${issuesHtml}
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card border-info mb-3">
+                            <div class="card-header bg-info text-white">
+                                <h6 class="mb-0">Service Status</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Ready:</strong> ${diagnostics.whatsappService.isReady ? '✅ Yes' : '❌ No'}</li>
+                                    <li><strong>Initializing:</strong> ${diagnostics.whatsappService.isInitializing ? '🔄 Yes' : '✅ No'}</li>
+                                    <li><strong>Fallback Mode:</strong> ${diagnostics.whatsappService.fallbackMode ? '⚠️ Yes' : '✅ No'}</li>
+                                    <li><strong>Attempts:</strong> ${diagnostics.whatsappService.initializationAttempts}/${diagnostics.whatsappService.maxRetries}</li>
+                                    <li><strong>Client Exists:</strong> ${diagnostics.whatsappService.clientExists ? '✅ Yes' : '❌ No'}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card border-secondary mb-3">
+                            <div class="card-header bg-secondary text-white">
+                                <h6 class="mb-0">Environment</h6>
+                            </div>
+                            <div class="card-body">
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Node:</strong> ${diagnostics.environment.nodeVersion}</li>
+                                    <li><strong>Platform:</strong> ${diagnostics.environment.platform}</li>
+                                    <li><strong>Architecture:</strong> ${diagnostics.environment.arch}</li>
+                                    <li><strong>Environment:</strong> ${diagnostics.environment.nodeEnv || 'development'}</li>
+                                    <li><strong>WhatsApp Disabled:</strong> ${diagnostics.environment.disableWhatsApp || 'false'}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card border-warning mb-3">
+                    <div class="card-header bg-warning">
+                        <h6 class="mb-0">Dependencies & Files</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>node_modules:</strong> ${diagnostics.directories.nodeModulesExists ? '✅ Found' : '❌ Missing'}</li>
+                                    <li><strong>Puppeteer:</strong> ${diagnostics.directories.puppeteerExists ? '✅ Found' : '❌ Missing'}</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <ul class="list-unstyled mb-0">
+                                    <li><strong>Auth Folder:</strong> ${diagnostics.directories.authExists ? '✅ Found' : '❌ Missing'}</li>
+                                    <li><strong>Cache Folder:</strong> ${diagnostics.directories.cacheExists ? '✅ Found' : '❌ Missing'}</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-3">
+                    <div class="btn-group" role="group">
+                        <button class="btn btn-success btn-sm" onclick="initializeWhatsApp()">
+                            <i class="fas fa-play"></i> Try Initialize
+                        </button>
+                        <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+                            <i class="fas fa-redo"></i> Restart
+                        </button>
+                        <button class="btn btn-danger btn-sm" onclick="resetWhatsAppService()">
+                            <i class="fas fa-power-off"></i> Reset
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="mt-3">
+                    <details>
+                        <summary class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-code"></i> View Raw Diagnostics
+                        </summary>
+                        <pre class="mt-2 p-2 bg-light border rounded" style="font-size: 0.8em; max-height: 200px; overflow-y: auto;">
+${JSON.stringify(diagnostics, null, 2)}
+                        </pre>
+                    </details>
+                </div>
+            `;
+            
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus('Failed to run diagnostics: ' + error.message, 'danger');
+            qrContainer.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle"></i> Diagnostics Failed
+                    <hr>
+                    <p>${error.message}</p>
+                </div>
+                <button class="btn btn-warning" onclick="runWhatsAppDiagnostics()">
+                    <i class="fas fa-redo"></i> Try Again
+                </button>
+            `;
+        }
+    } catch (error) {
+        showWhatsAppStatus('Error running diagnostics: ' + error.message, 'danger');
+        console.error('Diagnostics error:', error);
     }
 }
 
