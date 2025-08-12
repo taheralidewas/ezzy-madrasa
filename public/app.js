@@ -600,8 +600,8 @@ async function checkWhatsAppStatusAndPrompt() {
             // If WhatsApp is not connected and not in production mode, show prompt
             if (!status.isReady && !status.fallbackMode) {
                 showWhatsAppConnectionPrompt();
-            } else if (status.fallbackMode && !process.env.NODE_ENV) {
-                // In development but in fallback mode
+            } else if (status.fallbackMode) {
+                // WhatsApp is in fallback mode - could be disabled or having issues
                 showWhatsAppConnectionPrompt(true);
             }
         }
@@ -1080,7 +1080,7 @@ async function toggleWhatsAppService(enable) {
     try {
         const action = enable ? 'Enabling' : 'Disabling';
         showWhatsAppStatus(`${action} WhatsApp service...`, 'info');
-        
+
         const response = await fetch('/api/whatsapp/toggle', {
             method: 'POST',
             headers: {
@@ -1089,16 +1089,16 @@ async function toggleWhatsAppService(enable) {
             },
             body: JSON.stringify({ enable })
         });
-        
+
         if (response.ok) {
             const result = await response.json();
             showWhatsAppStatus(result.message, 'success');
-            
+
             // Refresh the diagnostics to show updated status
             setTimeout(() => {
                 runWhatsAppDiagnostics();
             }, 2000);
-            
+
             // Update WhatsApp button state
             if (enable) {
                 updateWhatsAppButton(false); // Not connected yet, but enabled
