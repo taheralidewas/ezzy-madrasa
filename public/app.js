@@ -141,13 +141,13 @@ document.addEventListener('DOMContentLoaded', function () {
     socket.on('whatsapp-detailed-error', (errorData) => {
         console.error('WhatsApp detailed error:', errorData);
         showWhatsAppStatus(`WhatsApp Error: ${errorData.message}`, 'danger');
-        
+
         const qrContainer = document.getElementById('qrCodeContainer');
         if (qrContainer) {
             let solutionHtml = '';
-            
+
             // Provide specific solutions based on error type
-            switch(errorData.type) {
+            switch (errorData.type) {
                 case 'chromium-missing':
                     solutionHtml = `
                         <div class="alert alert-info mt-2">
@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     `;
                     break;
             }
-            
+
             qrContainer.innerHTML = `
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-circle"></i> <strong>WhatsApp Error</strong>
@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     <p>Next retry in ${retryData.nextRetryIn} seconds...</p>
                     <div class="progress mt-2">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                             role="progressbar" style="width: ${(retryData.attempt/retryData.maxRetries)*100}%">
+                             role="progressbar" style="width: ${(retryData.attempt / retryData.maxRetries) * 100}%">
                         </div>
                     </div>
                 </div>
@@ -920,7 +920,7 @@ async function resetWhatsAppService() {
 async function runWhatsAppDiagnostics() {
     try {
         showWhatsAppStatus('Running WhatsApp diagnostics...', 'info');
-        
+
         const qrContainer = document.getElementById('qrCodeContainer');
         qrContainer.innerHTML = `
             <div class="spinner-border text-info mb-3" role="status">
@@ -928,19 +928,19 @@ async function runWhatsAppDiagnostics() {
             </div>
             <p>Analyzing WhatsApp service...</p>
         `;
-        
+
         const response = await fetch('/api/whatsapp/diagnostics', {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             const diagnostics = await response.json();
             console.log('WhatsApp Diagnostics:', diagnostics);
-            
+
             showWhatsAppStatus('Diagnostics completed. Check results below.', 'success');
-            
+
             // Display comprehensive diagnostics
             let issuesHtml = '';
             if (diagnostics.issues && diagnostics.issues.length > 0) {
@@ -953,7 +953,7 @@ async function runWhatsAppDiagnostics() {
                     </div>
                 `;
             }
-            
+
             qrContainer.innerHTML = `
                 <div class="alert alert-info">
                     <h6><i class="fas fa-stethoscope"></i> WhatsApp Diagnostics Report</h6>
@@ -1031,6 +1031,16 @@ async function runWhatsAppDiagnostics() {
                             <i class="fas fa-power-off"></i> Reset
                         </button>
                     </div>
+                    <div class="mt-2">
+                        <button class="btn btn-outline-success btn-sm me-2" onclick="toggleWhatsAppService(true)" 
+                                ${diagnostics.environment.disableWhatsApp === 'false' ? 'disabled' : ''}>
+                            <i class="fas fa-toggle-on"></i> Enable WhatsApp
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="toggleWhatsAppService(false)"
+                                ${diagnostics.environment.disableWhatsApp === 'true' ? 'disabled' : ''}>
+                            <i class="fas fa-toggle-off"></i> Disable WhatsApp
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="mt-3">
@@ -1044,7 +1054,7 @@ ${JSON.stringify(diagnostics, null, 2)}
                     </details>
                 </div>
             `;
-            
+
         } else {
             const error = await response.json();
             showWhatsAppStatus('Failed to run diagnostics: ' + error.message, 'danger');
@@ -1062,6 +1072,45 @@ ${JSON.stringify(diagnostics, null, 2)}
     } catch (error) {
         showWhatsAppStatus('Error running diagnostics: ' + error.message, 'danger');
         console.error('Diagnostics error:', error);
+    }
+}
+
+// Function to toggle WhatsApp service on/off
+async function toggleWhatsAppService(enable) {
+    try {
+        const action = enable ? 'Enabling' : 'Disabling';
+        showWhatsAppStatus(`${action} WhatsApp service...`, 'info');
+        
+        const response = await fetch('/api/whatsapp/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ enable })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            showWhatsAppStatus(result.message, 'success');
+            
+            // Refresh the diagnostics to show updated status
+            setTimeout(() => {
+                runWhatsAppDiagnostics();
+            }, 2000);
+            
+            // Update WhatsApp button state
+            if (enable) {
+                updateWhatsAppButton(false); // Not connected yet, but enabled
+            } else {
+                updateWhatsAppButton(false, true); // Disabled
+            }
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus(`Failed to ${enable ? 'enable' : 'disable'} WhatsApp: ${error.message}`, 'danger');
+        }
+    } catch (error) {
+        showWhatsAppStatus(`Error ${enable ? 'enabling' : 'disabling'} WhatsApp: ${error.message}`, 'danger');
     }
 }
 

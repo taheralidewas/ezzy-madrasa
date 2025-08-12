@@ -128,6 +128,42 @@ app.post('/api/whatsapp/reset', (req, res) => {
   }
 });
 
+// Toggle WhatsApp service on/off (Admin only)
+app.post('/api/whatsapp/toggle', (req, res) => {
+  try {
+    const { enable } = req.body;
+    
+    if (enable) {
+      // Enable WhatsApp
+      process.env.DISABLE_WHATSAPP = 'false';
+      whatsappService.fallbackMode = false;
+      whatsappService.resetService();
+      setTimeout(() => {
+        whatsappService.initialize(io);
+      }, 1000);
+      res.json({ 
+        success: true, 
+        message: 'WhatsApp service enabled and initializing...',
+        enabled: true 
+      });
+    } else {
+      // Disable WhatsApp
+      process.env.DISABLE_WHATSAPP = 'true';
+      whatsappService.fallbackMode = true;
+      if (whatsappService.client) {
+        whatsappService.client.destroy();
+      }
+      res.json({ 
+        success: true, 
+        message: 'WhatsApp service disabled',
+        enabled: false 
+      });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Diagnostic endpoint for WhatsApp troubleshooting
 app.get('/api/whatsapp/diagnostics', (req, res) => {
   try {
