@@ -88,7 +88,7 @@ class WhatsAppService {
     
     // Notify frontend that initialization started
     if (this.io) {
-      this.io.emit('whatsapp-initializing', 'WhatsApp client is starting...');
+      this.io.emit('whatsapp-initializing', 'Starting WhatsApp service... This may take a moment.');
     }
     
     // Set a timeout to prevent hanging initialization
@@ -97,9 +97,9 @@ class WhatsAppService {
       this.fallbackMode = true;
       this.isInitializing = false;
       if (this.io) {
-        this.io.emit('whatsapp-timeout', 'WhatsApp initialization timed out');
+        this.io.emit('whatsapp-timeout', 'WhatsApp initialization timed out. Please try restarting the service.');
       }
-    }, 60000); // Reduced to 1 minute timeout
+    }, 45000); // Reduced timeout for faster feedback
 
     try {
       this.client = new Client({
@@ -109,7 +109,7 @@ class WhatsAppService {
         puppeteer: {
           headless: true,
           executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-          timeout: 30000, // Reduced from 60000
+          timeout: 25000, // Faster timeout
           args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -129,8 +129,6 @@ class WhatsAppService {
             '--disable-extensions',
             '--disable-plugins',
             '--disable-images',
-            '--disable-javascript',
-            '--disable-plugins-discovery',
             '--disable-preconnect',
             '--disable-sync',
             '--no-default-browser-check',
@@ -139,9 +137,9 @@ class WhatsAppService {
             '--disk-cache-size=1'
           ]
         },
-        qrMaxRetries: 3, // Limit QR retries
-        takeoverOnConflict: true, // Handle session conflicts faster
-        takeoverTimeoutMs: 10000 // Faster takeover timeout
+        qrMaxRetries: 2, // Reduced retries for faster feedback
+        takeoverOnConflict: true,
+        takeoverTimeoutMs: 8000 // Faster takeover
       });
 
       // Clear timeout on successful initialization

@@ -4,9 +4,9 @@ let socket = null;
 let whatsappConnected = false;
 
 // Comprehensive browser extension error suppression
-(function() {
+(function () {
     'use strict';
-    
+
     // List of extension-related error patterns
     const extensionErrorPatterns = [
         'message channel closed',
@@ -19,17 +19,17 @@ let whatsappConnected = false;
         'Could not establish connection',
         'Receiving end does not exist'
     ];
-    
+
     // Function to check if error is extension-related
     function isExtensionError(message) {
         if (!message) return false;
-        return extensionErrorPatterns.some(pattern => 
+        return extensionErrorPatterns.some(pattern =>
             message.toLowerCase().includes(pattern.toLowerCase())
         );
     }
-    
+
     // Handle unhandled promise rejections (most common source)
-    window.addEventListener('unhandledrejection', function(event) {
+    window.addEventListener('unhandledrejection', function (event) {
         const message = event.reason?.message || event.reason?.toString() || '';
         if (isExtensionError(message)) {
             event.preventDefault();
@@ -41,7 +41,7 @@ let whatsappConnected = false;
     }, true);
 
     // Handle general JavaScript errors
-    window.addEventListener('error', function(event) {
+    window.addEventListener('error', function (event) {
         const message = event.message || event.error?.message || '';
         if (isExtensionError(message)) {
             event.preventDefault();
@@ -51,20 +51,20 @@ let whatsappConnected = false;
             return false;
         }
     }, true);
-    
+
     // Override console.error to filter extension errors
     const originalConsoleError = console.error;
-    console.error = function(...args) {
+    console.error = function (...args) {
         const message = args.join(' ');
         if (!isExtensionError(message)) {
             originalConsoleError.apply(console, args);
         }
     };
-    
+
     // Suppress specific Chrome extension errors
     if (typeof chrome !== 'undefined' && chrome.runtime) {
         const originalSendMessage = chrome.runtime.sendMessage;
-        chrome.runtime.sendMessage = function(...args) {
+        chrome.runtime.sendMessage = function (...args) {
             try {
                 return originalSendMessage.apply(this, args);
             } catch (error) {
@@ -78,35 +78,35 @@ let whatsappConnected = false;
 })();
 
 // Initialize app
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Initialize socket connection
     socket = io();
-    
+
     // Socket event listeners
     socket.on('whatsapp-initializing', (message) => {
         showWhatsAppStatus(message, 'info');
     });
-    
+
     socket.on('whatsapp-qr', (qr) => {
         console.log('Received QR code from server:', qr ? 'QR data received' : 'No QR data');
         showWhatsAppStatus('Scan QR code to connect WhatsApp', 'warning');
         displayQRCode(qr);
         updateWhatsAppButton(false);
     });
-    
+
     socket.on('whatsapp-ready', () => {
         showWhatsAppStatus('WhatsApp connected successfully!', 'success');
         whatsappConnected = true;
         updateWhatsAppButton(true);
         hideQRModal();
     });
-    
+
     socket.on('whatsapp-disconnected', () => {
         showWhatsAppStatus('WhatsApp disconnected', 'danger');
         whatsappConnected = false;
         updateWhatsAppButton(false);
     });
-    
+
     socket.on('whatsapp-timeout', () => {
         showWhatsAppStatus('WhatsApp initialization timed out. Try restarting.', 'warning');
         const qrContainer = document.getElementById('qrCodeContainer');
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
     });
-    
+
     socket.on('whatsapp-error', (error) => {
         showWhatsAppStatus('WhatsApp error: ' + error, 'danger');
         const qrContainer = document.getElementById('qrCodeContainer');
@@ -157,11 +157,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
         }
-        
+
         // Update WhatsApp button to show disabled state
         updateWhatsAppButton(false, true);
     });
-    
+
     // Handle real-time work completion updates
     socket.on('work-completed', (data) => {
         showNotification(`✅ Task "${data.title}" completed by ${data.completedBy}`, 'success');
@@ -189,10 +189,10 @@ function showLoginModal() {
 
 async function handleLogin(e) {
     e.preventDefault();
-    
+
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-    
+
     try {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
@@ -201,9 +201,9 @@ async function handleLogin(e) {
             },
             body: JSON.stringify({ email, password })
         });
-        
+
         const data = await response.json();
-        
+
         if (response.ok) {
             localStorage.setItem('token', data.token);
             currentUser = data.user;
@@ -224,7 +224,7 @@ async function validateToken(token) {
                 'Authorization': `Bearer ${token}`
             }
         });
-        
+
         if (response.ok) {
             currentUser = await response.json();
             showDashboard();
@@ -249,20 +249,25 @@ function logout() {
 function showDashboard() {
     document.getElementById('userInfo').textContent = `${currentUser.name} (${currentUser.role})`;
     document.getElementById('dashboardContent').style.display = 'block';
-    
+
     // Show assign work button for managers and admins
     if (['admin', 'manager'].includes(currentUser.role)) {
         document.getElementById('assignWorkBtn').style.display = 'inline-block';
         document.getElementById('reportsBtn').style.display = 'inline-block';
         loadUsers();
     }
-    
+
     // Show WhatsApp button for admin only
     if (currentUser.role === 'admin') {
         document.getElementById('whatsappBtn').style.display = 'inline-block';
         updateWhatsAppButton(whatsappConnected);
+
+        // Auto-check WhatsApp status and show connection popup if needed
+        setTimeout(() => {
+            checkWhatsAppStatusAndPrompt();
+        }, 1000);
     }
-    
+
     loadWorks();
 }
 
@@ -274,7 +279,7 @@ async function loadWorks() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         const works = await response.json();
         displayWorks(works);
     } catch (error) {
@@ -284,19 +289,19 @@ async function loadWorks() {
 
 function displayWorks(works) {
     const workList = document.getElementById('workList');
-    
+
     if (!works || works.length === 0) {
         workList.innerHTML = '<p class="text-muted">No work assignments found.</p>';
         return;
     }
-    
+
     workList.innerHTML = works.map(work => {
         // Safety checks for work object properties
         if (!work || !work.assignedBy || !work.assignedTo) {
             console.warn('Invalid work object:', work);
             return '';
         }
-        
+
         return `
             <div class="card mb-3 priority-${work.priority || 'medium'} status-${work.status || 'pending'}">
                 <div class="card-body">
@@ -335,10 +340,10 @@ async function loadUsers() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         const users = await response.json();
         const assignToSelect = document.getElementById('assignTo');
-        
+
         assignToSelect.innerHTML = '<option value="">Select User</option>' +
             users.map(user => `<option value="${user._id}">${user.name} (${user.role} - ${user.department})</option>`).join('');
     } catch (error) {
@@ -353,7 +358,7 @@ function showAssignWorkModal() {
 
 async function handleAssignWork(e) {
     e.preventDefault();
-    
+
     const workData = {
         title: document.getElementById('workTitle').value,
         description: document.getElementById('workDescription').value,
@@ -361,7 +366,7 @@ async function handleAssignWork(e) {
         priority: document.getElementById('workPriority').value,
         dueDate: document.getElementById('workDueDate').value
     };
-    
+
     try {
         const response = await fetch('/api/work', {
             method: 'POST',
@@ -371,7 +376,7 @@ async function handleAssignWork(e) {
             },
             body: JSON.stringify(workData)
         });
-        
+
         if (response.ok) {
             bootstrap.Modal.getInstance(document.getElementById('assignWorkModal')).hide();
             document.getElementById('assignWorkForm').reset();
@@ -396,7 +401,7 @@ async function updateWorkStatus(workId, status) {
             },
             body: JSON.stringify({ status })
         });
-        
+
         if (response.ok) {
             loadWorks();
         } else {
@@ -447,7 +452,7 @@ function showNotification(message, type) {
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     `;
-    
+
     // Auto-hide after 5 seconds
     setTimeout(() => {
         const alert = statusDiv.querySelector('.alert');
@@ -461,19 +466,83 @@ function showNotification(message, type) {
 function showWhatsAppModal() {
     const modal = new bootstrap.Modal(document.getElementById('whatsappQRModal'));
     modal.show();
-    
+
     // Fix accessibility issue by removing aria-hidden when modal is shown
     const modalElement = document.getElementById('whatsappQRModal');
     modalElement.addEventListener('shown.bs.modal', function () {
         modalElement.removeAttribute('aria-hidden');
     });
-    
+
     modalElement.addEventListener('hidden.bs.modal', function () {
         modalElement.setAttribute('aria-hidden', 'true');
     });
-    
+
     // Check WhatsApp status first to determine what to show
     checkWhatsAppStatus();
+}
+
+// Function to automatically check WhatsApp status and prompt admin to connect
+async function checkWhatsAppStatusAndPrompt() {
+    if (currentUser.role !== 'admin') return;
+
+    try {
+        const response = await fetch('/api/whatsapp/status', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (response.ok) {
+            const status = await response.json();
+
+            // If WhatsApp is not connected and not in production mode, show prompt
+            if (!status.isReady && !status.fallbackMode) {
+                showWhatsAppConnectionPrompt();
+            } else if (status.fallbackMode && !process.env.NODE_ENV) {
+                // In development but in fallback mode
+                showWhatsAppConnectionPrompt(true);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking WhatsApp status:', error);
+    }
+}
+
+// Function to show a simple WhatsApp connection prompt
+function showWhatsAppConnectionPrompt(isReset = false) {
+    const message = isReset
+        ? 'WhatsApp service needs to be reset. Would you like to connect WhatsApp for task notifications?'
+        : 'WhatsApp is not connected. Would you like to connect it now for task notifications?';
+
+    const promptHtml = `
+        <div class="alert alert-warning alert-dismissible fade show whatsapp-prompt" role="alert">
+            <i class="fab fa-whatsapp text-success"></i> <strong>WhatsApp Setup Required</strong>
+            <hr>
+            <p class="mb-3">${message}</p>
+            <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-success btn-sm pulse-success" onclick="connectWhatsAppNow()">
+                    <i class="fas fa-link"></i> Connect Now
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="dismissWhatsAppPrompt()">
+                    <i class="fas fa-clock"></i> Maybe Later
+                </button>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="dismissWhatsAppPrompt()"></button>
+        </div>
+    `;
+
+    document.getElementById('whatsappStatus').innerHTML = promptHtml;
+}
+
+// Function to connect WhatsApp immediately
+function connectWhatsAppNow() {
+    dismissWhatsAppPrompt();
+    showWhatsAppModal();
+}
+
+// Function to dismiss the WhatsApp prompt
+function dismissWhatsAppPrompt() {
+    document.getElementById('whatsappStatus').innerHTML = '';
 }
 
 // Function to check WhatsApp status
@@ -484,11 +553,11 @@ async function checkWhatsAppStatus() {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             const status = await response.json();
             console.log('WhatsApp Status:', status);
-            
+
             // Check if WhatsApp is disabled (production mode)
             if (status.fallbackMode && !status.isInitializing && !status.isReady) {
                 // Show production disabled message
@@ -573,38 +642,60 @@ async function checkWhatsAppStatus() {
 function displayQRCode(qrData) {
     console.log('Displaying QR code:', qrData.substring(0, 50) + '...');
     const qrContainer = document.getElementById('qrCodeContainer');
-    
+
     if (!qrContainer) {
         console.error('QR container not found!');
         return;
     }
-    
-    // Always use online QR generator for reliability
+
+    // Show success message and QR code
     qrContainer.innerHTML = `
-        <div class="qr-code-display mb-3">
-            <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
-                 alt="WhatsApp QR Code" class="img-fluid border rounded" 
-                 onload="console.log('QR image loaded successfully')"
-                 onerror="console.error('QR image failed to load')">
+        <div class="alert alert-success mb-3">
+            <i class="fas fa-check-circle"></i> <strong>QR Code Ready!</strong>
+            <br><small>Scan with your phone to connect WhatsApp</small>
         </div>
-        <p class="text-success"><i class="fas fa-qrcode"></i> Scan this QR code with WhatsApp</p>
-        <div class="mt-3">
-            <button class="btn btn-primary btn-sm me-2" onclick="initializeWhatsApp()">
-                <i class="fas fa-play"></i> Initialize WhatsApp
-            </button>
-            <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
-                <i class="fas fa-redo"></i> Restart WhatsApp
-            </button>
+        <div class="qr-code-display mb-3 p-3 bg-white border rounded shadow-sm">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrData)}" 
+                 alt="WhatsApp QR Code" class="img-fluid" 
+                 onload="console.log('QR image loaded successfully')"
+                 onerror="handleQRImageError(this)">
+        </div>
+        <div class="text-center">
+            <div class="spinner-border spinner-border-sm text-success me-2" role="status">
+                <span class="visually-hidden">Waiting for scan...</span>
+            </div>
+            <small class="text-muted">Waiting for you to scan the QR code...</small>
         </div>
     `;
-    
+
+    // Auto-refresh QR code after 2 minutes if not connected
+    setTimeout(() => {
+        if (!whatsappConnected && qrContainer.innerHTML.includes('Waiting for you to scan')) {
+            showWhatsAppStatus('QR code expired. Generating a new one...', 'warning');
+            restartWhatsApp();
+        }
+    }, 120000); // 2 minutes
+
     console.log('QR code display updated');
+}
+
+// Handle QR image loading errors
+function handleQRImageError(img) {
+    console.error('QR image failed to load, trying alternative method');
+    img.parentElement.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> QR image failed to load
+        </div>
+        <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
+            <i class="fas fa-redo"></i> Try Again
+        </button>
+    `;
 }
 
 function updateWhatsAppButton(connected, disabled = false) {
     const btn = document.getElementById('whatsappBtn');
     const btnText = document.getElementById('whatsappBtnText');
-    
+
     if (disabled) {
         btn.className = 'btn btn-secondary me-2';
         btnText.innerHTML = '<i class="fas fa-ban"></i> WhatsApp Disabled (Production)';
@@ -631,17 +722,17 @@ function hideQRModal() {
 async function restartWhatsApp() {
     try {
         showWhatsAppStatus('Restarting WhatsApp service...', 'info');
-        
+
         const response = await fetch('/api/whatsapp/restart', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             showWhatsAppStatus('WhatsApp service restarted. Generating new QR code...', 'success');
-            
+
             // Reset QR container to show loading
             const qrContainer = document.getElementById('qrCodeContainer');
             qrContainer.innerHTML = `
@@ -663,17 +754,17 @@ async function restartWhatsApp() {
 async function initializeWhatsApp() {
     try {
         showWhatsAppStatus('Initializing WhatsApp service...', 'info');
-        
+
         const response = await fetch('/api/whatsapp/init', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             showWhatsAppStatus('WhatsApp initialization triggered. Please wait...', 'success');
-            
+
             // Reset QR container to show loading
             const qrContainer = document.getElementById('qrCodeContainer');
             qrContainer.innerHTML = `
@@ -695,17 +786,17 @@ async function initializeWhatsApp() {
 async function resetWhatsAppService() {
     try {
         showWhatsAppStatus('Resetting WhatsApp service completely...', 'info');
-        
+
         const response = await fetch('/api/whatsapp/reset', {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             showWhatsAppStatus('WhatsApp service reset successfully. Generating QR code...', 'success');
-            
+
             // Reset QR container to show loading
             const qrContainer = document.getElementById('qrCodeContainer');
             qrContainer.innerHTML = `
@@ -729,9 +820,9 @@ let currentReportsData = null;
 function showReportsModal() {
     const modal = new bootstrap.Modal(document.getElementById('reportsModal'));
     modal.show();
-    
+
     // Set up period change handler
-    document.getElementById('reportPeriod').addEventListener('change', function() {
+    document.getElementById('reportPeriod').addEventListener('change', function () {
         const customDateFields = ['customDateStart', 'customDateEnd'];
         if (this.value === 'custom') {
             customDateFields.forEach(id => document.getElementById(id).style.display = 'block');
@@ -739,7 +830,7 @@ function showReportsModal() {
             customDateFields.forEach(id => document.getElementById(id).style.display = 'none');
         }
     });
-    
+
     // Load initial reports
     loadReports();
 }
@@ -747,20 +838,20 @@ function showReportsModal() {
 async function loadReports() {
     const loadingDiv = document.getElementById('reportsLoading');
     const contentDiv = document.getElementById('reportsContent');
-    
+
     // Show loading
     loadingDiv.style.display = 'block';
     contentDiv.style.display = 'none';
-    
+
     try {
         const period = document.getElementById('reportPeriod').value;
         let url = `/api/work/reports?period=${period}`;
-        
+
         // Add custom date range if selected
         if (period === 'custom') {
             const startDate = document.getElementById('reportStartDate').value;
             const endDate = document.getElementById('reportEndDate').value;
-            
+
             if (startDate && endDate) {
                 url += `&startDate=${startDate}&endDate=${endDate}`;
             } else {
@@ -770,13 +861,13 @@ async function loadReports() {
                 return;
             }
         }
-        
+
         const response = await fetch(url, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
         });
-        
+
         if (response.ok) {
             currentReportsData = await response.json();
             displayReports(currentReportsData);
@@ -799,7 +890,7 @@ function displayReports(data) {
 
 function displayReportsSummary(summary) {
     const summaryDiv = document.getElementById('reportsSummary');
-    
+
     summaryDiv.innerHTML = `
         <div class="col-md-3">
             <div class="card bg-primary text-white">
@@ -866,12 +957,12 @@ function displayReportsSummary(summary) {
 
 function displayMemberReports(memberReports) {
     const tbody = document.getElementById('memberReportsBody');
-    
+
     if (!memberReports || memberReports.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No data available for the selected period</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = memberReports.map(report => `
         <tr>
             <td>
@@ -911,10 +1002,10 @@ function displayMemberReports(memberReports) {
 function showMemberDetail(userId, userName) {
     const memberReport = currentReportsData.memberReports.find(r => r.user.id === userId);
     if (!memberReport) return;
-    
+
     const modal = new bootstrap.Modal(document.getElementById('memberDetailModal'));
     document.getElementById('memberDetailTitle').textContent = `${userName} - Task Details`;
-    
+
     const content = document.getElementById('memberDetailContent');
     content.innerHTML = `
         <div class="row mb-4">
@@ -1028,7 +1119,7 @@ function showMemberDetail(userId, userName) {
             </div>
         </div>
     `;
-    
+
     modal.show();
 }
 
@@ -1037,7 +1128,7 @@ function exportReports() {
         alert('No data to export');
         return;
     }
-    
+
     // Create CSV content
     const headers = ['Member Name', 'Department', 'Role', 'Total Tasks', 'Completed', 'Pending', 'In Progress', 'Cancelled', 'Completion Rate (%)', 'Avg Completion Days'];
     const csvContent = [
@@ -1055,7 +1146,7 @@ function exportReports() {
             report.avgCompletionTime
         ].join(','))
     ].join('\n');
-    
+
     // Create and download file
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
