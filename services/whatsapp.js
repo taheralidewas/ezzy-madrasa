@@ -65,14 +65,27 @@ class WhatsAppService {
   }
 
   initialize(io) {
-    // Skip WhatsApp initialization in production if environment variable is set or if in containerized environment
-    if (process.env.DISABLE_WHATSAPP === 'true' || process.env.NODE_ENV === 'production') {
-      console.log('WhatsApp integration disabled in production environment');
+    // Check if we're in Railway production environment
+    const isRailwayProduction = process.env.RAILWAY_ENVIRONMENT === 'production' || 
+                               process.env.NODE_ENV === 'production' ||
+                               process.env.RAILWAY_PROJECT_ID;
+    
+    // Allow WhatsApp in production if explicitly enabled
+    const enableInProduction = process.env.ENABLE_WHATSAPP_PRODUCTION === 'true';
+    
+    // Skip WhatsApp initialization only if explicitly disabled
+    if (process.env.DISABLE_WHATSAPP === 'true') {
+      console.log('WhatsApp integration disabled by environment variable');
       this.fallbackMode = true;
       if (io) {
-        io.emit('whatsapp-disabled', 'WhatsApp integration is disabled in production for stability');
+        io.emit('whatsapp-disabled', 'WhatsApp integration is disabled');
       }
       return;
+    }
+    
+    // Log if we're enabling WhatsApp in production
+    if (isRailwayProduction && enableInProduction) {
+      console.log('🚀 WhatsApp enabled in Railway production environment');
     }
 
     if (this.isInitializing) {
@@ -84,92 +97,74 @@ class WhatsAppService {
     this.initializationAttempts++;
     this.isInitializing = true;
     
-    console.log(`Initializing WhatsApp client (attempt ${this.initializationAttempts}/${this.maxRetries})...`);
+    console.log(`🚀 Starting WhatsApp client (attempt ${this.initializationAttempts}/${this.maxRetries})...`);
+    
+    // Clear old session data first for fresh start
+    this.clearSessionData();
     
     // Notify frontend that initialization started
     if (this.io) {
-      this.io.emit('whatsapp-initializing', 'Starting WhatsApp service... This may take a moment.');
+      this.io.emit('whatsapp-initializing', 'Starting WhatsApp service...');
     }
-    
-    // Set a timeout to prevent hanging initialization
-    const initTimeout = setTimeout(() => {
-      console.log('WhatsApp initialization timeout - enabling fallback mode');
-      this.fallbackMode = true;
-      this.isInitializing = false;
-      if (this.io) {
-        this.io.emit('whatsapp-timeout', 'WhatsApp initialization timed out. Please try restarting the service.');
-      }
-    }, 45000); // Reduced timeout for faster feedback
 
     try {
+      // Railway/Production optimized Puppeteer configuration
+      const puppeteerConfig = {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+          '--no-first-run',
+          '--no-zygote',
+          '--single-process', // Important for Railway
+          '--disable-background-timer-throttling',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-renderer-backgrounding'
+        ]
+      };
+
+      // Add Railway-specific executable path if available
+      if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+        puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      }
+
       this.client = new Client({
         authStrategy: new LocalAuth({
           dataPath: '.wwebjs_auth'
         }),
-        puppeteer: {
-          headless: true,
-          executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-          timeout: 25000, // Faster timeout
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-background-timer-throttling',
-            '--disable-backgrounding-occluded-windows',
-            '--disable-renderer-backgrounding',
-            '--disable-features=TranslateUI',
-            '--disable-ipc-flooding-protection',
-            '--disable-web-security',
-            '--disable-features=VizDisplayCompositor',
-            '--disable-extensions',
-            '--disable-plugins',
-            '--disable-images',
-            '--disable-preconnect',
-            '--disable-sync',
-            '--no-default-browser-check',
-            '--no-pings',
-            '--media-cache-size=1',
-            '--disk-cache-size=1'
-          ]
-        },
-        qrMaxRetries: 2, // Reduced retries for faster feedback
-        takeoverOnConflict: true,
-        takeoverTimeoutMs: 8000 // Faster takeover
-      });
-
-      // Clear timeout on successful initialization
-      this.client.on('ready', () => {
-        clearTimeout(initTimeout);
-        this.isInitializing = false;
+        puppeteer: puppeteerConfig
       });
 
     this.client.on('qr', (qr) => {
       console.log('✅ WhatsApp QR Code generated successfully');
       console.log('QR Code length:', qr.length);
       console.log('QR Code preview:', qr.substring(0, 50) + '...');
+      console.log('🚀 Railway Production - QR Code ready for frontend');
       
-      // Generate QR in terminal for debugging
-      try {
-        qrcode.generate(qr, { small: true });
-      } catch (terminalError) {
-        console.log('Terminal QR generation failed:', terminalError.message);
+      // Generate QR in terminal for debugging (skip in production to save resources)
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          qrcode.generate(qr, { small: true });
+        } catch (terminalError) {
+          console.log('Terminal QR generation failed:', terminalError.message);
+        }
       }
       
       // Send QR to frontend immediately
       if (this.io) {
         this.io.emit('whatsapp-qr', qr);
-        console.log('✅ QR code sent to frontend via socket');
+        console.log('✅ QR code sent to frontend via socket (Railway Production)');
         
         // Also send a status update
         this.io.emit('whatsapp-status-update', {
           status: 'qr-ready',
           message: 'QR Code generated successfully. Please scan with your phone.',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          environment: 'Railway Production'
         });
       } else {
         console.error('❌ Socket.io not available - cannot send QR to frontend');
@@ -247,7 +242,6 @@ class WhatsAppService {
 
     // Handle initialization errors with detailed logging
     this.client.initialize().catch((error) => {
-      clearTimeout(initTimeout);
       this.isInitializing = false;
       
       console.error('❌ WhatsApp initialization error:');
@@ -311,7 +305,6 @@ class WhatsAppService {
     });
 
     } catch (error) {
-      clearTimeout(initTimeout);
       this.isInitializing = false;
       console.error('WhatsApp client creation error:', error);
       this.fallbackMode = true;

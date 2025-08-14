@@ -113,6 +113,21 @@ app.post('/api/whatsapp/init', (req, res) => {
   }
 });
 
+// Simple fix endpoint - clears session and restarts
+app.post('/api/whatsapp/fix', (req, res) => {
+  try {
+    console.log('🔧 WhatsApp fix triggered - clearing session and restarting');
+    whatsappService.clearSessionData();
+    whatsappService.resetService();
+    setTimeout(() => {
+      whatsappService.initialize(io);
+    }, 2000);
+    res.json({ success: true, message: 'WhatsApp service fixed and restarting' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Endpoint to reset WhatsApp service completely (get out of fallback mode)
 app.post('/api/whatsapp/reset', (req, res) => {
   try {

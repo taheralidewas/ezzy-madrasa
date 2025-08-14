@@ -188,6 +188,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 ${solutionHtml}
                 <div class="btn-group mt-3" role="group">
+                    <button class="btn btn-success" onclick="fixWhatsApp()">
+                        <i class="fas fa-wrench"></i> Quick Fix
+                    </button>
                     <button class="btn btn-warning" onclick="restartWhatsApp()">
                         <i class="fas fa-redo"></i> Restart Service
                     </button>
@@ -1457,4 +1460,173 @@ function exportReports() {
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+}
+//
+ Quick fix function for WhatsApp issues
+async function fixWhatsApp() {
+        try {
+            showWhatsAppStatus('Fixing WhatsApp service...', 'info');
+
+            const qrContainer = document.getElementById('qrCodeContainer');
+            if (qrContainer) {
+                qrContainer.innerHTML = `
+                <div class="spinner-border text-success mb-3" role="status">
+                    <span class="visually-hidden">Fixing WhatsApp...</span>
+                </div>
+                <p>🔧 Clearing session data and restarting service...</p>
+            `;
+            }
+
+            const response = await fetch('/api/whatsapp/fix', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                showWhatsAppStatus('WhatsApp service fixed! Generating new QR code...', 'success');
+
+                // Wait a moment for the service to restart
+                setTimeout(() => {
+                    checkWhatsAppStatus();
+                }, 3000);
+            } else {
+                const error = await response.json();
+                showWhatsAppStatus('Fix failed: ' + error.message, 'danger');
+            }
+        } catch (error) {
+            showWhatsAppStatus('Fix failed: ' + error.message, 'danger');
+        }
+    }
+
+// Restart WhatsApp function
+async function restartWhatsApp() {
+        try {
+            showWhatsAppStatus('Restarting WhatsApp service...', 'info');
+
+            const response = await fetch('/api/whatsapp/restart', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+
+            if (response.ok) {
+                showWhatsAppStatus('WhatsApp service restarted! Generating QR code...', 'success');
+            } else {
+                const error = await response.json();
+                showWhatsAppStatus('Restart failed: ' + error.message, 'danger');
+            }
+        } catch (error) {
+            showWhatsAppStatus('Restart failed: ' + error.message, 'danger');
+        }
+    }
+
+// Reset WhatsApp service completely
+async function resetWhatsAppService() {
+    try {
+        showWhatsAppStatus('Resetting WhatsApp service completely...', 'warning');
+
+        const response = await fetch('/api/whatsapp/reset', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp service reset! Starting fresh...', 'success');
+            setTimeout(() => {
+                checkWhatsAppStatus();
+            }, 2000);
+        } else {
+            const error = await response.json();
+            showWhatsAppStatus('Reset failed: ' + error.message, 'danger');
+        }
+    } catch (error) {
+        showWhatsAppStatus('Reset failed: ' + error.message, 'danger');
+    }
+}
+
+// Update WhatsApp button state
+function updateWhatsAppButton(connected, disabled = false) {
+    const btn = document.getElementById('whatsappBtn');
+    if (!btn) return;
+
+    if (disabled) {
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> WhatsApp (Disabled)';
+        btn.className = 'btn btn-secondary me-2';
+        btn.disabled = true;
+    } else if (connected) {
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> WhatsApp (Connected)';
+        btn.className = 'btn btn-success me-2';
+        btn.disabled = false;
+    } else {
+        btn.innerHTML = '<i class="fab fa-whatsapp"></i> Connect WhatsApp';
+        btn.className = 'btn btn-warning me-2';
+        btn.disabled = false;
+    }
+}
+
+// Display QR Code
+function displayQRCode(qrData) {
+    console.log('Displaying QR code:', qrData.substring(0, 50) + '...');
+
+    const qrContainer = document.getElementById('qrCodeContainer');
+    if (!qrContainer) return;
+
+    // Create QR code using a simple library or show as text
+    qrContainer.innerHTML = `
+        <div class="text-center">
+            <div class="alert alert-success mb-3">
+                <i class="fas fa-qrcode"></i> <strong>QR Code Generated Successfully!</strong>
+            </div>
+            <div id="qrcode" class="mb-3"></div>
+            <p class="text-muted">Scan this QR code with your WhatsApp mobile app</p>
+            <div class="mt-3">
+                <button class="btn btn-outline-secondary btn-sm" onclick="fixWhatsApp()">
+                    <i class="fas fa-wrench"></i> Refresh QR
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Generate QR code using qrcode.js library (if available) or show as canvas
+    try {
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(document.getElementById('qrcode'), {
+                text: qrData,
+                width: 256,
+                height: 256,
+                colorDark: '#000000',
+                colorLight: '#ffffff'
+            });
+        } else {
+            // Fallback: show QR data as text and suggest manual entry
+            document.getElementById('qrcode').innerHTML = `
+                <div class="alert alert-info">
+                    <p><strong>QR Code Data:</strong></p>
+                    <textarea class="form-control" rows="3" readonly>${qrData}</textarea>
+                    <small class="text-muted mt-2 d-block">Copy this text and use "Link a Device" in WhatsApp Web</small>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('QR Code generation error:', error);
+        document.getElementById('qrcode').innerHTML = `
+            <div class="alert alert-warning">
+                <p>QR Code generated but display failed. Use the text below:</p>
+                <textarea class="form-control" rows="3" readonly>${qrData}</textarea>
+            </div>
+        `;
+    }
+}
+
+// Hide QR Modal
+function hideQRModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('whatsappQRModal'));
+    if (modal) {
+        modal.hide();
+    }
 }
