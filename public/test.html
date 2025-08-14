@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ezzy Madrasa - Test Page</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">🕌 Ezzy Madrasa - System Test</h5>
+                    </div>
+                    <div class="card-body">
+                        <h6>🔧 System Status Check</h6>
+                        <div id="testResults">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Testing...</span>
+                            </div>
+                            <p class="mt-2">Running system tests...</p>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h6>🚪 Quick Login Test</h6>
+                            <form id="quickLoginForm">
+                                <div class="mb-3">
+                                    <input type="email" class="form-control" placeholder="Email" value="admin@ezzymadrasa.com">
+                                </div>
+                                <div class="mb-3">
+                                    <input type="password" class="form-control" placeholder="Password" value="admin123">
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Test Login</button>
+                            </form>
+                            <div id="loginResult" class="mt-3"></div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <a href="/" class="btn btn-success">← Back to Main App</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Test system functionality
+        document.addEventListener('DOMContentLoaded', async function() {
+            const testResults = document.getElementById('testResults');
+            
+            // Test 1: Check if server is responding
+            try {
+                const response = await fetch('/api/db-status');
+                const dbStatus = await response.json();
+                
+                let results = '<div class="alert alert-success">✅ Server is responding</div>';
+                results += `<div class="alert alert-info">📊 Database Status: ${dbStatus.status}</div>`;
+                
+                // Test 2: Check if users exist
+                try {
+                    const setupResponse = await fetch('/api/setup-users', { method: 'POST' });
+                    const setupData = await setupResponse.json();
+                    
+                    if (setupData.success) {
+                        results += '<div class="alert alert-success">✅ Users created successfully</div>';
+                    } else {
+                        results += '<div class="alert alert-info">ℹ️ Users already exist</div>';
+                    }
+                } catch (error) {
+                    results += '<div class="alert alert-warning">⚠️ User setup test failed</div>';
+                }
+                
+                testResults.innerHTML = results;
+                
+            } catch (error) {
+                testResults.innerHTML = '<div class="alert alert-danger">❌ Server connection failed: ' + error.message + '</div>';
+            }
+            
+            // Handle login form
+            document.getElementById('quickLoginForm').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                const loginResult = document.getElementById('loginResult');
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: 'admin@ezzymadrasa.com',
+                            password: 'admin123'
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        loginResult.innerHTML = '<div class="alert alert-success">✅ Login successful! Redirecting...</div>';
+                        localStorage.setItem('token', data.token);
+                        setTimeout(() => {
+                            window.location.href = '/';
+                        }, 2000);
+                    } else {
+                        loginResult.innerHTML = '<div class="alert alert-danger">❌ Login failed: ' + data.message + '</div>';
+                    }
+                } catch (error) {
+                    loginResult.innerHTML = '<div class="alert alert-danger">❌ Login error: ' + error.message + '</div>';
+                }
+            });
+        });
+    </script>
+</body>
+</html>
