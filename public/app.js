@@ -77,10 +77,34 @@ let whatsappConnected = false;
     }
 })();
 
+// Add immediate debugging
+console.log('🔧 JavaScript file loaded');
+
+// Test if DOM is ready
+if (document.readyState === 'loading') {
+    console.log('📄 DOM is still loading...');
+} else {
+    console.log('📄 DOM is already ready');
+}
+
 // Initialize app
 document.addEventListener('DOMContentLoaded', function () {
+    console.log('🚀 App initializing...');
+    
+    // Test basic DOM elements
+    const loginModal = document.getElementById('loginModal');
+    const dashboardContent = document.getElementById('dashboardContent');
+    console.log('🔍 DOM Elements Check:');
+    console.log('  - Login Modal:', loginModal ? '✅ Found' : '❌ Missing');
+    console.log('  - Dashboard:', dashboardContent ? '✅ Found' : '❌ Missing');
+    
     // Initialize socket connection
-    socket = io();
+    try {
+        socket = io();
+        console.log('📡 Socket initialized successfully');
+    } catch (error) {
+        console.error('❌ Socket initialization failed:', error);
+    }
 
     // Socket event listeners
     socket.on('whatsapp-initializing', (message) => {
@@ -275,9 +299,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Check if user is logged in
     const token = localStorage.getItem('token');
+    console.log('🔑 Token check:', token ? 'Token found' : 'No token');
+    
     if (token) {
+        console.log('🔍 Validating existing token...');
         validateToken(token);
     } else {
+        console.log('🚪 No token found, showing login modal...');
         showLoginModal();
     }
 
@@ -288,8 +316,26 @@ document.addEventListener('DOMContentLoaded', function () {
 
 // Authentication functions
 function showLoginModal() {
-    const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
-    loginModal.show();
+    console.log('🚪 Attempting to show login modal...');
+    try {
+        const loginModalElement = document.getElementById('loginModal');
+        console.log('🔍 Login modal element:', loginModalElement ? 'Found' : 'Not found');
+        
+        if (!loginModalElement) {
+            console.error('❌ Login modal element not found in DOM');
+            // Fallback: show a simple alert
+            alert('Login system loading... Please refresh the page if this persists.');
+            return;
+        }
+        
+        const loginModal = new bootstrap.Modal(loginModalElement);
+        loginModal.show();
+        console.log('✅ Login modal should be visible now');
+    } catch (error) {
+        console.error('❌ Error showing login modal:', error);
+        // Fallback: show a simple alert
+        alert('Login system error. Please refresh the page.');
+    }
 }
 
 async function handleLogin(e) {
