@@ -90,14 +90,14 @@ if (document.readyState === 'loading') {
 // Initialize app
 document.addEventListener('DOMContentLoaded', function () {
     console.log('🚀 App initializing...');
-    
+
     // Test basic DOM elements
     const loginModal = document.getElementById('loginModal');
     const dashboardContent = document.getElementById('dashboardContent');
     console.log('🔍 DOM Elements Check:');
     console.log('  - Login Modal:', loginModal ? '✅ Found' : '❌ Missing');
     console.log('  - Dashboard:', dashboardContent ? '✅ Found' : '❌ Missing');
-    
+
     // Initialize socket connection
     try {
         socket = io();
@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // Check if user is logged in
     const token = localStorage.getItem('token');
     console.log('🔑 Token check:', token ? 'Token found' : 'No token');
-    
+
     if (token) {
         console.log('🔍 Validating existing token...');
         validateToken(token);
@@ -320,14 +320,14 @@ function showLoginModal() {
     try {
         const loginModalElement = document.getElementById('loginModal');
         console.log('🔍 Login modal element:', loginModalElement ? 'Found' : 'Not found');
-        
+
         if (!loginModalElement) {
             console.error('❌ Login modal element not found in DOM');
             // Fallback: show a simple alert
             alert('Login system loading... Please refresh the page if this persists.');
             return;
         }
-        
+
         const loginModal = new bootstrap.Modal(loginModalElement);
         loginModal.show();
         console.log('✅ Login modal should be visible now');
@@ -1507,8 +1507,8 @@ function exportReports() {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
 }
-//
- Quick fix function for WhatsApp issues
+
+// Quick fix function for WhatsApp issues
 async function fixWhatsApp() {
         try {
             showWhatsAppStatus('Fixing WhatsApp service...', 'info');
