@@ -123,20 +123,63 @@ class WhatsAppService {
           '--single-process', // Important for Railway
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding'
+          '--disable-renderer-backgrounding',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
         ]
       };
 
-      // Add Railway-specific executable path if available
+      // Try to find Chromium executable in Railway/Nixpacks environment
+      const fs = require('fs');
+      const { execSync } = require('child_process');
+      
+      // First try environment variable
       if (process.env.PUPPETEER_EXECUTABLE_PATH) {
         puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+        console.log(`🚀 Using Chromium from env: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
+      } else {
+        // Try to find Chromium in common locations
+        const possiblePaths = [
+          '/usr/bin/chromium-browser',
+          '/usr/bin/chromium',
+          '/usr/bin/google-chrome-stable',
+          '/usr/bin/google-chrome'
+        ];
+
+        for (const path of possiblePaths) {
+          try {
+            if (fs.existsSync(path)) {
+              puppeteerConfig.executablePath = path;
+              console.log(`🚀 Found Chromium at: ${path}`);
+              break;
+            }
+          } catch (error) {
+            // Continue to next path
+          }
+        }
+
+        // Try to find Chromium using which command (for Nixpacks)
+        if (!puppeteerConfig.executablePath) {
+          try {
+            const chromiumPath = execSync('which chromium', { encoding: 'utf8' }).trim();
+            if (chromiumPath) {
+              puppeteerConfig.executablePath = chromiumPath;
+              console.log(`🚀 Found Chromium via which: ${chromiumPath}`);
+            }
+          } catch (error) {
+            console.log('Could not find Chromium via which command');
+          }
+        }
       }
 
       this.client = new Client({
         authStrategy: new LocalAuth({
           dataPath: '.wwebjs_auth'
         }),
-        puppeteer: puppeteerConfig
+        puppeteer: puppeteerConfig,
+        qrMaxRetries: 3
       });
 
     this.client.on('qr', (qr) => {

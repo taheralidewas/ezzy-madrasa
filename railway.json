@@ -12,7 +12,9 @@
     "production": {
       "variables": {
         "ENABLE_WHATSAPP_PRODUCTION": "true",
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
+        "PUPPETEER_EXECUTABLE_PATH": "/nix/store/*/bin/chromium"
       }
     }
   }
