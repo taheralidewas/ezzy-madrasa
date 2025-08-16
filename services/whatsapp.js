@@ -73,9 +73,49 @@ class WhatsAppService {
     // Allow WhatsApp in production if explicitly enabled
     const enableInProduction = process.env.ENABLE_WHATSAPP_PRODUCTION === 'true';
     
-    // Enable WhatsApp in Railway production with Chromium support
+    // Disable WhatsApp in Railway production for stability
     if (isRailwayProduction) {
-      console.log('🚀 WhatsApp enabled in Railway production with Chromium support');
+      console.log('📱 WhatsApp disabled in Railway production for stability');
+      this.fallbackMode = true;
+      if (io) {
+        io.emit('whatsapp-disabled', `
+          <div class="alert alert-info">
+            <h5><i class="fab fa-whatsapp text-success"></i> WhatsApp Integration Status</h5>
+            <hr>
+            <p><strong>✅ Production Mode:</strong> Your task management system is fully operational!</p>
+            <div class="row">
+              <div class="col-md-6">
+                <p><strong>🚀 Working Features:</strong></p>
+                <ul class="mb-2">
+                  <li>✅ Task assignment and management</li>
+                  <li>✅ User dashboard and progress tracking</li>
+                  <li>✅ Real-time updates via web interface</li>
+                  <li>✅ Reports and analytics</li>
+                  <li>✅ Member performance tracking</li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <p><strong>📱 For WhatsApp QR Code:</strong></p>
+                <div class="alert alert-success">
+                  <strong>Local Development Setup:</strong><br>
+                  <code>git clone [your-repo]</code><br>
+                  <code>npm install</code><br>
+                  <code>npm start</code><br>
+                  <small>Visit http://localhost:3000 - WhatsApp works perfectly!</small>
+                </div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <small class="text-muted">
+                <i class="fas fa-info-circle"></i> 
+                <strong>Why local for WhatsApp?</strong> Browser automation (Puppeteer) works best in local environments. 
+                All core business features work perfectly in production!
+              </small>
+            </div>
+          </div>
+        `);
+      }
+      return;
     }
     
     // Skip WhatsApp initialization only if explicitly disabled
