@@ -18,8 +18,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies including whatsapp-web.js with its Puppeteer
+RUN npm ci --only=production && \
+    npm ls puppeteer-core || npm install puppeteer-core@latest
 
 # Copy application code
 COPY . .
