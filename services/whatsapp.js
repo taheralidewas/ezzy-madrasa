@@ -145,36 +145,52 @@ class WhatsAppService {
         puppeteerConfig.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
         console.log(`🚀 Using Chromium from env: ${process.env.PUPPETEER_EXECUTABLE_PATH}`);
       } else {
-        // Try to find Chromium in common locations
-        const possiblePaths = [
-          '/usr/bin/chromium-browser',
-          '/usr/bin/chromium',
-          '/usr/bin/google-chrome-stable',
-          '/usr/bin/google-chrome'
-        ];
+        // For Nixpacks/Railway, try to find Chromium using which command first
+        try {
+          const chromiumPath = execSync('which chromium', { encoding: 'utf8' }).trim();
+          if (chromiumPath && fs.existsSync(chromiumPath)) {
+            puppeteerConfig.executablePath = chromiumPath;
+            console.log(`🚀 Found Chromium via which: ${chromiumPath}`);
+          }
+        } catch (error) {
+          console.log('Could not find Chromium via which command, trying standard paths...');
+          
+          // Fallback to common locations
+          const possiblePaths = [
+            '/usr/bin/chromium',
+            '/usr/bin/chromium-browser', 
+            '/usr/bin/google-chrome-stable',
+            '/usr/bin/google-chrome'
+          ];
 
-        for (const path of possiblePaths) {
-          try {
-            if (fs.existsSync(path)) {
-              puppeteerConfig.executablePath = path;
-              console.log(`🚀 Found Chromium at: ${path}`);
-              break;
+          for (const path of possiblePaths) {
+            try {
+              if (fs.existsSync(path)) {
+                puppeteerConfig.executablePath = path;
+                console.log(`🚀 Found Chromium at: ${path}`);
+                break;
+              }
+            } catch (error) {
+              // Continue to next path
             }
-          } catch (error) {
-            // Continue to next path
           }
         }
-
-        // Try to find Chromium using which command (for Nixpacks)
+        
+        // If still not found, log available browsers for debugging
         if (!puppeteerConfig.executablePath) {
           try {
-            const chromiumPath = execSync('which chromium', { encoding: 'utf8' }).trim();
-            if (chromiumPath) {
-              puppeteerConfig.executablePath = chromiumPath;
-              console.log(`🚀 Found Chromium via which: ${chromiumPath}`);
+            console.log('🔍 Debugging: Available browsers in system:');
+            const browsers = execSync('ls -la /usr/bin/*chrom* /usr/bin/*firefox* 2>/dev/null || echo "No browsers found"', { encoding: 'utf8' });
+            console.log(browsers);
+            
+            // Try to find any Nix store chromium
+            const nixChromium = execSync('find /nix/store -name "chromium" -type f 2>/dev/null | head -1', { encoding: 'utf8' }).trim();
+            if (nixChromium && fs.existsSync(nixChromium)) {
+              puppeteerConfig.executablePath = nixChromium;
+              console.log(`🚀 Found Nix Chromium: ${nixChromium}`);
             }
           } catch (error) {
-            console.log('Could not find Chromium via which command');
+            console.log('Could not debug browser locations');
           }
         }
       }
