@@ -73,34 +73,9 @@ class WhatsAppService {
     // Allow WhatsApp in production if explicitly enabled
     const enableInProduction = process.env.ENABLE_WHATSAPP_PRODUCTION === 'true';
     
-    // For Railway production, use a simpler approach - disable WhatsApp by default
-    // This avoids Puppeteer/Chromium installation issues on Railway
-    if (isRailwayProduction && !enableInProduction) {
-      console.log('📱 WhatsApp integration disabled in Railway production (use local development for WhatsApp)');
-      this.fallbackMode = true;
-      if (io) {
-        io.emit('whatsapp-disabled', `
-          <div class="alert alert-info">
-            <h5><i class="fab fa-whatsapp text-success"></i> WhatsApp Integration Status</h5>
-            <hr>
-            <p><strong>Production Mode:</strong> WhatsApp is disabled on Railway for stability.</p>
-            <p><strong>✅ All other features work perfectly:</strong></p>
-            <ul class="mb-2">
-              <li>✅ Task assignment and management</li>
-              <li>✅ User dashboard and progress tracking</li>
-              <li>✅ Real-time updates via web interface</li>
-              <li>✅ Reports and analytics</li>
-            </ul>
-            <p><strong>💡 For WhatsApp QR code:</strong> Run the app locally in development mode.</p>
-            <div class="mt-3">
-              <small class="text-muted">
-                <strong>Local Setup:</strong> Clone the repo → <code>npm install</code> → <code>npm start</code> → WhatsApp QR code works perfectly!
-              </small>
-            </div>
-          </div>
-        `);
-      }
-      return;
+    // Enable WhatsApp in Railway production with Chromium support
+    if (isRailwayProduction) {
+      console.log('🚀 WhatsApp enabled in Railway production with Chromium support');
     }
     
     // Skip WhatsApp initialization only if explicitly disabled

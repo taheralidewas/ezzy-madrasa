@@ -1510,64 +1510,64 @@ function exportReports() {
 
 // Quick fix function for WhatsApp issues
 async function fixWhatsApp() {
-        try {
-            showWhatsAppStatus('Fixing WhatsApp service...', 'info');
+    try {
+        showWhatsAppStatus('Fixing WhatsApp service...', 'info');
 
-            const qrContainer = document.getElementById('qrCodeContainer');
-            if (qrContainer) {
-                qrContainer.innerHTML = `
+        const qrContainer = document.getElementById('qrCodeContainer');
+        if (qrContainer) {
+            qrContainer.innerHTML = `
                 <div class="spinner-border text-success mb-3" role="status">
                     <span class="visually-hidden">Fixing WhatsApp...</span>
                 </div>
                 <p>🔧 Clearing session data and restarting service...</p>
             `;
+        }
+
+        const response = await fetch('/api/whatsapp/fix', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
+        });
 
-            const response = await fetch('/api/whatsapp/fix', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp service fixed! Generating new QR code...', 'success');
 
-            if (response.ok) {
-                showWhatsAppStatus('WhatsApp service fixed! Generating new QR code...', 'success');
-
-                // Wait a moment for the service to restart
-                setTimeout(() => {
-                    checkWhatsAppStatus();
-                }, 3000);
-            } else {
-                const error = await response.json();
-                showWhatsAppStatus('Fix failed: ' + error.message, 'danger');
-            }
-        } catch (error) {
+            // Wait a moment for the service to restart
+            setTimeout(() => {
+                checkWhatsAppStatus();
+            }, 3000);
+        } else {
+            const error = await response.json();
             showWhatsAppStatus('Fix failed: ' + error.message, 'danger');
         }
+    } catch (error) {
+        showWhatsAppStatus('Fix failed: ' + error.message, 'danger');
     }
+}
 
 // Restart WhatsApp function
 async function restartWhatsApp() {
-        try {
-            showWhatsAppStatus('Restarting WhatsApp service...', 'info');
+    try {
+        showWhatsAppStatus('Restarting WhatsApp service...', 'info');
 
-            const response = await fetch('/api/whatsapp/restart', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-
-            if (response.ok) {
-                showWhatsAppStatus('WhatsApp service restarted! Generating QR code...', 'success');
-            } else {
-                const error = await response.json();
-                showWhatsAppStatus('Restart failed: ' + error.message, 'danger');
+        const response = await fetch('/api/whatsapp/restart', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
             }
-        } catch (error) {
+        });
+
+        if (response.ok) {
+            showWhatsAppStatus('WhatsApp service restarted! Generating QR code...', 'success');
+        } else {
+            const error = await response.json();
             showWhatsAppStatus('Restart failed: ' + error.message, 'danger');
         }
+    } catch (error) {
+        showWhatsAppStatus('Restart failed: ' + error.message, 'danger');
     }
+}
 
 // Reset WhatsApp service completely
 async function resetWhatsAppService() {
