@@ -119,7 +119,8 @@ class WhatsAppService {
     }
     
     // Skip WhatsApp initialization only if explicitly disabled
-    if (process.env.DISABLE_WHATSAPP === 'true') {
+    if (process.env.DISABLE_WHATSAPP === 'true' || isRailwayProduction) {
+
       console.log('WhatsApp integration disabled by environment variable');
       this.fallbackMode = true;
       if (io) {
