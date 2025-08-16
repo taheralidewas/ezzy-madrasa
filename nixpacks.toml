@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["nodejs_18"]
+nixPkgs = ["nodejs_18", "chromium"]
 
 [phases.install]
 cmds = ["npm install"]
@@ -9,5 +9,4 @@ cmd = "npm start"
 
 [variables]
 NODE_ENV = "production"
-DISABLE_WHATSAPP = "true"
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
