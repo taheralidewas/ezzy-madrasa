@@ -1615,58 +1615,39 @@ function updateWhatsAppButton(connected, disabled = false) {
     }
 }
 
-// Display QR Code
+// Display QR Code (image-based so it always scans directly)
 function displayQRCode(qrData) {
     console.log('Displaying QR code:', qrData.substring(0, 50) + '...');
 
     const qrContainer = document.getElementById('qrCodeContainer');
     if (!qrContainer) return;
 
-    // Create QR code using a simple library or show as text
     qrContainer.innerHTML = `
+        <div class="alert alert-success mb-3">
+            <i class="fas fa-check-circle"></i> <strong>QR Code Ready!</strong>
+            <br><small>Scan with your phone to connect WhatsApp</small>
+        </div>
+        <div class="qr-code-display mb-3 p-3 bg-white border rounded shadow-sm text-center">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodeURIComponent(qrData)}" 
+                 alt="WhatsApp QR Code" class="img-fluid"
+                 onload="console.log('QR image loaded successfully')"
+                 onerror="handleQRImageError(this)">
+        </div>
         <div class="text-center">
-            <div class="alert alert-success mb-3">
-                <i class="fas fa-qrcode"></i> <strong>QR Code Generated Successfully!</strong>
+            <div class="spinner-border spinner-border-sm text-success me-2" role="status">
+                <span class="visually-hidden">Waiting for scan...</span>
             </div>
-            <div id="qrcode" class="mb-3"></div>
-            <p class="text-muted">Scan this QR code with your WhatsApp mobile app</p>
-            <div class="mt-3">
-                <button class="btn btn-outline-secondary btn-sm" onclick="fixWhatsApp()">
-                    <i class="fas fa-wrench"></i> Refresh QR
-                </button>
-            </div>
+            <small class="text-muted">Waiting for you to scan the QR code...</small>
         </div>
     `;
 
-    // Generate QR code using qrcode.js library (if available) or show as canvas
-    try {
-        if (typeof QRCode !== 'undefined') {
-            new QRCode(document.getElementById('qrcode'), {
-                text: qrData,
-                width: 256,
-                height: 256,
-                colorDark: '#000000',
-                colorLight: '#ffffff'
-            });
-        } else {
-            // Fallback: show QR data as text and suggest manual entry
-            document.getElementById('qrcode').innerHTML = `
-                <div class="alert alert-info">
-                    <p><strong>QR Code Data:</strong></p>
-                    <textarea class="form-control" rows="3" readonly>${qrData}</textarea>
-                    <small class="text-muted mt-2 d-block">Copy this text and use "Link a Device" in WhatsApp Web</small>
-                </div>
-            `;
+    // Auto-refresh QR code after 2 minutes if not connected
+    setTimeout(() => {
+        if (!whatsappConnected && qrContainer.innerHTML.includes('Waiting for you to scan')) {
+            showWhatsAppStatus('QR code expired. Generating a new one...', 'warning');
+            restartWhatsApp();
         }
-    } catch (error) {
-        console.error('QR Code generation error:', error);
-        document.getElementById('qrcode').innerHTML = `
-            <div class="alert alert-warning">
-                <p>QR Code generated but display failed. Use the text below:</p>
-                <textarea class="form-control" rows="3" readonly>${qrData}</textarea>
-            </div>
-        `;
-    }
+    }, 120000);
 }
 
 // Hide QR Modal
