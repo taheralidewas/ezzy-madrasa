@@ -73,8 +73,8 @@ class WhatsAppService {
     // Allow WhatsApp in production if explicitly enabled
     const enableInProduction = process.env.ENABLE_WHATSAPP_PRODUCTION === 'true';
     
-    // Disable WhatsApp in Railway production for stability
-    if (isRailwayProduction) {
+    // Disable WhatsApp in Railway production for stability unless explicitly enabled
+    if (isRailwayProduction && !enableInProduction) {
       console.log('📱 WhatsApp disabled in Railway production for stability');
       this.fallbackMode = true;
       if (io) {
@@ -109,7 +109,7 @@ class WhatsAppService {
               <small class="text-muted">
                 <i class="fas fa-info-circle"></i> 
                 <strong>Why local for WhatsApp?</strong> Browser automation (Puppeteer) works best in local environments. 
-                All core business features work perfectly in production!
+                All core business features work perfectly in production! To enable WhatsApp in production, set <code>ENABLE_WHATSAPP_PRODUCTION=true</code>.
               </small>
             </div>
           </div>
@@ -119,7 +119,7 @@ class WhatsAppService {
     }
     
     // Skip WhatsApp initialization only if explicitly disabled
-    if (process.env.DISABLE_WHATSAPP === 'true' || isRailwayProduction) {
+    if (process.env.DISABLE_WHATSAPP === 'true') {
 
       console.log('WhatsApp integration disabled by environment variable');
       this.fallbackMode = true;
