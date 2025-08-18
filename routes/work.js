@@ -347,4 +347,19 @@ router.get('/reports', auth, async (req, res) => {
     }
 });
 
+// Admin-only: Clear all work tasks (start fresh)
+router.delete('/all', auth, async (req, res) => {
+	try {
+		const currentUser = await User.findById(req.userId);
+		if (!currentUser || currentUser.role !== 'admin') {
+			return res.status(403).json({ message: 'Only admin can clear all tasks' });
+		}
+
+		await Work.deleteMany({});
+		return res.json({ success: true, message: 'All tasks cleared' });
+	} catch (error) {
+		return res.status(500).json({ message: error.message });
+	}
+});
+
 module.exports = router;
