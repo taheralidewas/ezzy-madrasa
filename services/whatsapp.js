@@ -199,7 +199,7 @@ class WhatsAppService {
           // Fallback to common locations
           const possiblePaths = [
             '/usr/bin/chromium',
-            '/usr/bin/chromium-browser', 
+            // intentionally skipping '/usr/bin/chromium-browser' because it is often a snap shim
             '/usr/bin/google-chrome-stable',
             '/usr/bin/google-chrome'
           ];
@@ -217,15 +217,17 @@ class WhatsAppService {
           }
         }
         
-        // If still not found, log available browsers for debugging
-        if (!puppeteerConfig.executablePath) {
+        // If still not found, or we accidentally picked the snap shim 'chromium-browser',
+        // try to find a real Chromium binary in the Nix store (Railway/Nixpacks)
+        const looksLikeSnapShim = puppeteerConfig.executablePath && puppeteerConfig.executablePath.includes('chromium-browser');
+        if (!puppeteerConfig.executablePath || looksLikeSnapShim) {
           try {
             console.log('🔍 Debugging: Available browsers in system:');
             const browsers = execSync('ls -la /usr/bin/*chrom* /usr/bin/*firefox* 2>/dev/null || echo "No browsers found"', { encoding: 'utf8' });
             console.log(browsers);
             
             // Try to find any Nix store chromium
-            const nixChromium = execSync('find /nix/store -name "chromium" -type f 2>/dev/null | head -1', { encoding: 'utf8' }).trim();
+            const nixChromium = execSync('find /nix/store -path "*/bin/chromium" -type f 2>/dev/null | head -1', { encoding: 'utf8' }).trim();
             if (nixChromium && fs.existsSync(nixChromium)) {
               puppeteerConfig.executablePath = nixChromium;
               console.log(`🚀 Found Nix Chromium: ${nixChromium}`);
@@ -233,6 +235,12 @@ class WhatsAppService {
           } catch (error) {
             console.log('Could not debug browser locations');
           }
+        }
+
+        // Final safeguard: if we still ended up with chromium-browser (snap shim), unset it
+        if (puppeteerConfig.executablePath && puppeteerConfig.executablePath.includes('chromium-browser')) {
+          console.log('⚠️ Detected chromium-browser snap shim, clearing path to avoid launch failure');
+          delete puppeteerConfig.executablePath;
         }
       }
 
