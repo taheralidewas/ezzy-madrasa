@@ -11,6 +11,8 @@ class WhatsAppService {
     this.isInitializing = false;
     this.fallbackMode = false;
     this.qrGenerationStartTime = null;
+    // Queue messages while WhatsApp is not yet ready
+    this.messageQueue = [];
   }
 
   // Method to clear old session data for faster QR generation
@@ -300,6 +302,13 @@ class WhatsAppService {
       if (this.io) {
         this.io.emit('whatsapp-ready');
       }
+
+      // Process any queued messages now that we are ready
+      try {
+        await this.processQueuedMessages();
+      } catch (e) {
+        console.log('Error processing queued messages:', e.message);
+      }
     });
 
     this.client.on('authenticated', () => {
@@ -434,8 +443,9 @@ class WhatsAppService {
     }
 
     if (!this.isReady) {
-      console.log('WhatsApp client not ready, message queued');
-      return false;
+      console.log('WhatsApp client not ready, queuing message');
+      this.enqueueMessage(phoneNumber, message);
+      return true;
     }
 
     try {
@@ -454,7 +464,42 @@ class WhatsAppService {
       return true;
     } catch (error) {
       console.error('Error sending WhatsApp message:', error);
+      // On error, queue for a retry later
+      this.enqueueMessage(phoneNumber, message);
       return false;
+    }
+  }
+
+  enqueueMessage(phoneNumber, message) {
+    const maxQueueSize = 1000;
+    if (this.messageQueue.length >= maxQueueSize) {
+      // Drop oldest to avoid unbounded growth
+      this.messageQueue.shift();
+    }
+    this.messageQueue.push({ phoneNumber, message, attempts: 0 });
+  }
+
+  async processQueuedMessages() {
+    if (this.fallbackMode || !this.isReady || !this.client) return;
+    const maxAttemptsPerMessage = 5;
+    const queueSnapshot = [...this.messageQueue];
+    this.messageQueue = [];
+
+    for (const item of queueSnapshot) {
+      try {
+        const sent = await this.sendMessage(item.phoneNumber, item.message);
+        if (!sent) {
+          if ((item.attempts || 0) + 1 < maxAttemptsPerMessage) {
+            this.messageQueue.push({ ...item, attempts: (item.attempts || 0) + 1 });
+          } else {
+            console.log('Dropping message after max attempts:', item.phoneNumber);
+          }
+        }
+      } catch (e) {
+        if ((item.attempts || 0) + 1 < maxAttemptsPerMessage) {
+          this.messageQueue.push({ ...item, attempts: (item.attempts || 0) + 1 });
+        }
+      }
     }
   }
 
