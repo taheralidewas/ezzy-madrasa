@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', function () {
         showWhatsAppStatus('WhatsApp connected successfully!', 'success');
         whatsappConnected = true;
         updateWhatsAppButton(true);
+        updateAssignButtonVisibility(true); // Show assign button when WhatsApp connects
         hideQRModal();
     });
 
@@ -129,6 +130,7 @@ document.addEventListener('DOMContentLoaded', function () {
         showWhatsAppStatus('WhatsApp disconnected', 'danger');
         whatsappConnected = false;
         updateWhatsAppButton(false);
+        updateAssignButtonVisibility(false); // Hide assign button when WhatsApp disconnects
     });
 
     socket.on('whatsapp-timeout', () => {
@@ -400,11 +402,21 @@ function showDashboard() {
     document.getElementById('userInfo').textContent = `${currentUser.name} (${currentUser.role})`;
     document.getElementById('dashboardContent').style.display = 'block';
 
-    // Show assign work button for managers and admins
+    // Show assign work button for managers and admins ONLY when WhatsApp is connected
     if (['admin', 'manager'].includes(currentUser.role)) {
-        document.getElementById('assignWorkBtn').style.display = 'inline-block';
+        // Initially hide the assign button until WhatsApp status is confirmed
+        document.getElementById('assignWorkBtn').style.display = 'none';
         document.getElementById('reportsBtn').style.display = 'inline-block';
         loadUsers();
+        
+        // Check WhatsApp status to determine if assign button should be shown
+        if (currentUser.role === 'admin') {
+            // For admin, check WhatsApp status first
+            checkWhatsAppStatusForButton();
+        } else {
+            // For managers, show assign button only if WhatsApp is connected
+            updateAssignButtonVisibility(whatsappConnected);
+        }
     }
 
     // Show WhatsApp button for admin only
@@ -419,6 +431,43 @@ function showDashboard() {
     }
 
     loadWorks();
+}
+
+// Function to check WhatsApp status specifically for button visibility
+async function checkWhatsAppStatusForButton() {
+    try {
+        const response = await fetch('/api/whatsapp/status', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+        });
+
+        if (response.ok) {
+            const status = await response.json();
+            updateAssignButtonVisibility(status.isReady);
+        } else {
+            // If we can't check status, hide the button for safety
+            updateAssignButtonVisibility(false);
+        }
+    } catch (error) {
+        console.error('Error checking WhatsApp status for button:', error);
+        updateAssignButtonVisibility(false);
+    }
+}
+
+// Function to update assign button visibility based on WhatsApp status
+function updateAssignButtonVisibility(whatsappConnected) {
+    const assignWorkBtn = document.getElementById('assignWorkBtn');
+    if (assignWorkBtn) {
+        if (whatsappConnected) {
+            assignWorkBtn.style.display = 'inline-block';
+            assignWorkBtn.className = 'btn btn-primary me-2';
+            assignWorkBtn.innerHTML = '<i class="fas fa-plus"></i> Assign Work';
+            assignWorkBtn.title = 'WhatsApp connected - Task notifications will be sent';
+        } else {
+            assignWorkBtn.style.display = 'none';
+        }
+    }
 }
 
 // Work management functions
@@ -649,8 +698,9 @@ async function checkWhatsAppStatusAndPrompt() {
             // Update the global state to match backend
             whatsappConnected = status.isReady;
             
-            // Update button state immediately
+            // Update button states immediately
             updateWhatsAppButton(whatsappConnected);
+            updateAssignButtonVisibility(whatsappConnected);
 
             // If WhatsApp is not connected and not in production mode, show prompt
             if (!status.isReady && !status.fallbackMode) {
@@ -718,6 +768,7 @@ async function checkWhatsAppStatus() {
             // Always sync the frontend state with backend
             whatsappConnected = status.isReady;
             updateWhatsAppButton(whatsappConnected);
+            updateAssignButtonVisibility(whatsappConnected); // Update assign button visibility
 
             // Check if WhatsApp is disabled (production mode)
             if (status.fallbackMode && !status.isInitializing && !status.isReady) {
@@ -742,6 +793,7 @@ async function checkWhatsAppStatus() {
                 }
                 showWhatsAppStatus('WhatsApp integration is disabled in production for stability', 'info');
                 updateWhatsAppButton(false, true);
+                updateAssignButtonVisibility(false); // Hide assign button in production mode
             } else if (status.isReady) {
                 // WhatsApp is connected - show connected status
                 showWhatsAppStatus('WhatsApp is connected and ready for notifications', 'success');
