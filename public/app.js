@@ -132,76 +132,54 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     socket.on('whatsapp-timeout', () => {
-        showWhatsAppStatus('WhatsApp initialization timed out. Try restarting.', 'warning');
-        const qrContainer = document.getElementById('qrCodeContainer');
-        if (qrContainer) {
-            qrContainer.innerHTML = `
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle"></i> QR generation timed out
-                </div>
-                <button class="btn btn-warning" onclick="restartWhatsApp()">
-                    <i class="fas fa-redo"></i> Restart WhatsApp
-                </button>
-            `;
-        }
-    });
-
-    socket.on('whatsapp-error', (error) => {
-        showWhatsAppStatus('WhatsApp error: ' + error, 'danger');
-        const qrContainer = document.getElementById('qrCodeContainer');
-        if (qrContainer) {
-            qrContainer.innerHTML = `
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle"></i> ${error}
-                </div>
-                <button class="btn btn-warning" onclick="restartWhatsApp()">
-                    <i class="fas fa-redo"></i> Try Again
-                </button>
-            `;
-        }
+        showWhatsAppStatus('WhatsApp connection timeout', 'warning');
     });
 
     // Handle detailed error reporting
     socket.on('whatsapp-detailed-error', (errorData) => {
         console.error('WhatsApp detailed error:', errorData);
-        showWhatsAppStatus(`WhatsApp Error: ${errorData.message}`, 'danger');
+        let solutionHtml = '';
+        
+        switch (errorData.type) {
+            case 'chromium-missing':
+                solutionHtml = `
+                    <div class="alert alert-info">
+                        <strong>Solution:</strong> Install Chromium browser or update Puppeteer dependencies.
+                    </div>
+                `;
+                break;
+            case 'navigation-timeout':
+                solutionHtml = `
+                    <div class="alert alert-info">
+                        <strong>Solution:</strong> Check internet connection and try restarting the service.
+                    </div>
+                `;
+                break;
+            case 'protocol-error':
+                solutionHtml = `
+                    <div class="alert alert-info">
+                        <strong>Solution:</strong> Clear session data and restart WhatsApp service.
+                    </div>
+                `;
+                break;
+            case 'connection-refused':
+                solutionHtml = `
+                    <div class="alert alert-info">
+                        <strong>Solution:</strong> Check firewall settings and internet connection.
+                    </div>
+                `;
+                break;
+            default:
+                solutionHtml = `
+                    <div class="alert alert-info">
+                        <strong>Solution:</strong> Try restarting the WhatsApp service or contact support.
+                    </div>
+                `;
+                break;
+        }
 
         const qrContainer = document.getElementById('qrCodeContainer');
         if (qrContainer) {
-            let solutionHtml = '';
-
-            // Provide specific solutions based on error type
-            switch (errorData.type) {
-                case 'chromium-missing':
-                    solutionHtml = `
-                        <div class="alert alert-info mt-2">
-                            <strong>Solution:</strong> Run <code>npm install</code> to install missing dependencies.
-                        </div>
-                    `;
-                    break;
-                case 'navigation-timeout':
-                    solutionHtml = `
-                        <div class="alert alert-info mt-2">
-                            <strong>Solution:</strong> Check your internet connection and try restarting.
-                        </div>
-                    `;
-                    break;
-                case 'protocol-error':
-                    solutionHtml = `
-                        <div class="alert alert-info mt-2">
-                            <strong>Solution:</strong> Clear session data using "Reset All" button.
-                        </div>
-                    `;
-                    break;
-                case 'connection-refused':
-                    solutionHtml = `
-                        <div class="alert alert-info mt-2">
-                            <strong>Solution:</strong> Check internet connection and firewall settings.
-                        </div>
-                    `;
-                    break;
-            }
-
             qrContainer.innerHTML = `
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-circle"></i> <strong>WhatsApp Error</strong>
@@ -263,7 +241,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Handle state changes
     socket.on('whatsapp-state-change', (state) => {
         console.log('WhatsApp state changed to:', state);
-        showWhatsAppStatus(`WhatsApp state: ${state}`, 'info');
+        if (this.io) {
+            this.io.emit('whatsapp-state-change', state);
+        }
     });
 
     socket.on('whatsapp-disabled', (message) => {
@@ -312,6 +292,25 @@ document.addEventListener('DOMContentLoaded', function () {
     // Form event listeners
     document.getElementById('loginForm').addEventListener('submit', handleLogin);
     document.getElementById('assignWorkForm').addEventListener('submit', handleAssignWork);
+
+    // Add page visibility change listener for WhatsApp status refresh
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && currentUser && currentUser.role === 'admin') {
+            console.log('Page became visible, refreshing WhatsApp status...');
+            setTimeout(() => {
+                checkWhatsAppStatus();
+            }, 1000);
+        }
+    });
+
+    // Add periodic WhatsApp status check for admin users
+    if (currentUser && currentUser.role === 'admin') {
+        setInterval(() => {
+            if (!document.hidden) {
+                checkWhatsAppStatus();
+            }
+        }, 30000); // Check every 30 seconds when page is visible
+    }
 });
 
 // Authentication functions
@@ -645,6 +644,13 @@ async function checkWhatsAppStatusAndPrompt() {
 
         if (response.ok) {
             const status = await response.json();
+            console.log('Auto-check WhatsApp status:', status);
+
+            // Update the global state to match backend
+            whatsappConnected = status.isReady;
+            
+            // Update button state immediately
+            updateWhatsAppButton(whatsappConnected);
 
             // If WhatsApp is not connected and not in production mode, show prompt
             if (!status.isReady && !status.fallbackMode) {
@@ -709,6 +715,10 @@ async function checkWhatsAppStatus() {
             const status = await response.json();
             console.log('WhatsApp Status:', status);
 
+            // Always sync the frontend state with backend
+            whatsappConnected = status.isReady;
+            updateWhatsAppButton(whatsappConnected);
+
             // Check if WhatsApp is disabled (production mode)
             if (status.fallbackMode && !status.isInitializing && !status.isReady) {
                 // Show production disabled message
@@ -732,21 +742,32 @@ async function checkWhatsAppStatus() {
                 }
                 showWhatsAppStatus('WhatsApp integration is disabled in production for stability', 'info');
                 updateWhatsAppButton(false, true);
-            } else if (status.fallbackMode) {
-                // Show fallback mode (development environment issue)
-                showWhatsAppStatus('WhatsApp is in fallback mode. Click Reset Service to fix.', 'warning');
+            } else if (status.isReady) {
+                // WhatsApp is connected - show connected status
+                showWhatsAppStatus('WhatsApp is connected and ready for notifications', 'success');
                 const qrContainer = document.getElementById('qrCodeContainer');
                 if (qrContainer) {
                     qrContainer.innerHTML = `
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle"></i> WhatsApp is in fallback mode
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> <strong>WhatsApp Connected!</strong>
+                            <hr>
+                            <p class="mb-2">✅ WhatsApp is connected and ready to send task notifications.</p>
+                            <p class="mb-0">Team members will receive WhatsApp messages when tasks are assigned.</p>
                         </div>
+                    `;
+                }
+            } else if (status.isInitializing) {
+                // Show initializing state
+                const qrContainer = document.getElementById('qrCodeContainer');
+                if (qrContainer) {
+                    qrContainer.innerHTML = `
+                        <div class="spinner-border text-success mb-3" role="status">
+                            <span class="visually-hidden">Initializing WhatsApp...</span>
+                        </div>
+                        <p>Initializing WhatsApp service...</p>
                         <div class="mt-3">
-                            <button class="btn btn-danger btn-sm me-2" onclick="resetWhatsAppService()">
-                                <i class="fas fa-power-off"></i> Reset Service
-                            </button>
                             <button class="btn btn-warning btn-sm" onclick="restartWhatsApp()">
-                                <i class="fas fa-redo"></i> Restart WhatsApp
+                                <i class="fas fa-redo"></i> Restart WhatsApp (if taking too long)
                             </button>
                         </div>
                     `;

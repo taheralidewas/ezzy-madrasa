@@ -13,6 +13,10 @@ class WhatsAppService {
     this.qrGenerationStartTime = null;
     // Queue messages while WhatsApp is not yet ready
     this.messageQueue = [];
+    // Add connection persistence tracking
+    this.lastConnectionTime = null;
+    this.connectionStable = false;
+    this.autoReconnectEnabled = true;
   }
 
   // Method to clear old session data for faster QR generation
@@ -289,6 +293,8 @@ class WhatsAppService {
     this.client.on('ready', async () => {
       console.log('WhatsApp client is ready!');
       this.isReady = true;
+      this.lastConnectionTime = new Date();
+      this.connectionStable = true;
       
       // Set business profile name
       try {
@@ -322,17 +328,21 @@ class WhatsAppService {
     this.client.on('disconnected', (reason) => {
       console.log('WhatsApp disconnected:', reason);
       this.isReady = false;
+      this.connectionStable = false;
       
       if (this.io) {
         this.io.emit('whatsapp-disconnected', reason);
       }
       
-      // Auto-retry connection if disconnected unexpectedly
-      if (this.initializationAttempts < this.maxRetries) {
-        console.log('Attempting to reconnect WhatsApp...');
+      // Only auto-retry if connection was stable and auto-reconnect is enabled
+      if (this.autoReconnectEnabled && this.connectionStable && this.initializationAttempts < this.maxRetries) {
+        console.log('Stable connection lost, attempting to reconnect WhatsApp...');
         setTimeout(() => {
           this.initialize(this.io);
         }, 5000);
+      } else if (this.initializationAttempts >= this.maxRetries) {
+        console.log('Max reconnection attempts reached or auto-reconnect disabled');
+        this.fallbackMode = true;
       }
     });
 
@@ -671,8 +681,39 @@ class WhatsAppService {
         pupBrowser: !!this.client.pupBrowser
       } : null,
       lastError: this.lastError || null,
-      serviceStartTime: this.serviceStartTime || new Date().toISOString()
+      serviceStartTime: this.serviceStartTime || new Date().toISOString(),
+      connectionHealth: {
+        lastConnectionTime: this.lastConnectionTime,
+        connectionStable: this.connectionStable,
+        autoReconnectEnabled: this.autoReconnectEnabled,
+        uptime: this.lastConnectionTime ? Date.now() - this.lastConnectionTime.getTime() : 0
+      }
     };
+  }
+
+  // Method to check connection health and prevent unnecessary disconnections
+  checkConnectionHealth() {
+    if (!this.client || !this.isReady) return false;
+    
+    try {
+      // Basic health check - if client exists and is ready, consider it healthy
+      const isHealthy = this.client && this.client.info && this.connectionStable;
+      
+      if (isHealthy && !this.lastConnectionTime) {
+        this.lastConnectionTime = new Date();
+      }
+      
+      return isHealthy;
+    } catch (error) {
+      console.log('Connection health check failed:', error.message);
+      return false;
+    }
+  }
+
+  // Method to enable/disable auto-reconnect
+  setAutoReconnect(enabled) {
+    this.autoReconnectEnabled = enabled;
+    console.log(`Auto-reconnect ${enabled ? 'enabled' : 'disabled'}`);
   }
 }
 

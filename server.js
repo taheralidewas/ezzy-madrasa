@@ -93,6 +93,24 @@ app.get('/api/whatsapp/status', (req, res) => {
   res.json(whatsappService.getStatus());
 });
 
+app.get('/api/whatsapp/health', (req, res) => {
+  try {
+    const health = whatsappService.checkConnectionHealth();
+    const status = whatsappService.getDetailedStatus();
+    res.json({
+      healthy: health,
+      status: status,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      healthy: false, 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 app.post('/api/whatsapp/restart', (req, res) => {
   try {
     whatsappService.forceRestart();
